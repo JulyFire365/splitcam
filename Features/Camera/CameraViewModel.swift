@@ -30,6 +30,7 @@ final class CameraViewModel: ObservableObject {
     @Published var isProcessing = false
     @Published var isDraggingDivider = false
     @Published var lastSavedThumbnail: UIImage?
+    @Published var camerasReady = false
 
     // MARK: - Engines
 
@@ -45,6 +46,8 @@ final class CameraViewModel: ObservableObject {
 
     private var recordedFrontURL: URL?
     private var recordedBackURL: URL?
+    private var frontReady = false
+    private var backReady = false
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -84,6 +87,10 @@ final class CameraViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.frontFrameBuffer = buffer
+                if !self.frontReady {
+                    self.frontReady = true
+                    self.checkCamerasReady()
+                }
             }
         }
 
@@ -91,6 +98,10 @@ final class CameraViewModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.backFrameBuffer = buffer
+                if !self.backReady {
+                    self.backReady = true
+                    self.checkCamerasReady()
+                }
             }
         }
 
@@ -124,7 +135,17 @@ final class CameraViewModel: ObservableObject {
     }
 
     func resumeSession() {
+        // 重新等待两个摄像头都出帧
+        frontReady = false
+        backReady = false
+        camerasReady = false
         cameraEngine.startSession()
+    }
+
+    private func checkCamerasReady() {
+        if frontReady && backReady && !camerasReady {
+            camerasReady = true
+        }
     }
 
     func openSystemPhotos() {

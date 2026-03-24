@@ -12,9 +12,12 @@ struct CameraView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // 全屏分屏预览（圆角）
-            splitPreview
-                .ignoresSafeArea()
+            // 全屏分屏预览（圆角），等待两个摄像头都出帧后显示
+            if viewModel.camerasReady {
+                splitPreview
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
 
             // 闪光效果 (拍照)
             if viewModel.showFlashEffect {
