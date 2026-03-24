@@ -7,28 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10001 /* SplitCamApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001; };
-		A10002 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002; };
-		A10003 /* CameraEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003; };
-		A10004 /* SplitLayoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10004; };
-		A10005 /* SplitPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10005; };
-		A10006 /* VideoComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006; };
-		A10007 /* MediaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007; };
-		A10008 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008; };
-		A10009 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009; };
-		A10010 /* CameraViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10010; };
-		A10011 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011; };
-		A10012 /* EditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10012; };
-		A10013 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10013; };
-		A10014 /* ExportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10014; };
-		A10015 /* SampleBufferDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10015; };
-		A10016 /* VideoPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10016; };
-		A10017 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10017; };
-		A10018 /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10018; };
-		A10019 /* DeviceCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10019; };
-		A10020 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10020; };
-		A10021 /* MediaStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022; };
-		A10022 /* GalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023; };
+		A10001 /* SplitCamApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* SplitCamApp.swift */; };
+		A10002 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* AppCoordinator.swift */; };
+		A10003 /* CameraEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* CameraEngine.swift */; };
+		A10004 /* SplitLayoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10004 /* SplitLayoutEngine.swift */; };
+		A10005 /* SplitPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10005 /* SplitPreviewView.swift */; };
+		A10006 /* VideoComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006 /* VideoComposer.swift */; };
+		A10007 /* MediaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007 /* MediaImporter.swift */; };
+		A10008 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008 /* HomeView.swift */; };
+		A10009 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009 /* CameraView.swift */; };
+		A10010 /* CameraViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10010 /* CameraViewModel.swift */; };
+		A10011 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* EditorView.swift */; };
+		A10012 /* EditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10012 /* EditorViewModel.swift */; };
+		A10013 /* ExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10013 /* ExportView.swift */; };
+		A10014 /* ExportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10014 /* ExportViewModel.swift */; };
+		A10015 /* SampleBufferDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10015 /* SampleBufferDisplayView.swift */; };
+		A10016 /* VideoPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10016 /* VideoPlayerView.swift */; };
+		A10017 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10017 /* ShareSheet.swift */; };
+		A10018 /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10018 /* Color+Hex.swift */; };
+		A10019 /* DeviceCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10019 /* DeviceCapability.swift */; };
+		A10020 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10020 /* Assets.xcassets */; };
+		A10021 /* MediaStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022 /* MediaStore.swift */; };
+		A10022 /* GalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023 /* GalleryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -110,14 +110,6 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
-		D10020 /* Gallery */ = {
-			isa = PBXGroup;
-			children = (
-				B10023 /* GalleryView.swift */,
-			);
-			path = Gallery;
-			sourceTree = "<group>";
-		};
 		D10004 /* Home */ = {
 			isa = PBXGroup;
 			children = (
@@ -163,14 +155,6 @@
 				D10019 /* MediaStore */,
 			);
 			path = Core;
-			sourceTree = "<group>";
-		};
-		D10019 /* MediaStore */ = {
-			isa = PBXGroup;
-			children = (
-				B10022 /* MediaStore.swift */,
-			);
-			path = MediaStore;
 			sourceTree = "<group>";
 		};
 		D10009 /* CameraEngine */ = {
@@ -250,6 +234,22 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		D10019 /* MediaStore */ = {
+			isa = PBXGroup;
+			children = (
+				B10022 /* MediaStore.swift */,
+			);
+			path = MediaStore;
+			sourceTree = "<group>";
+		};
+		D10020 /* Gallery */ = {
+			isa = PBXGroup;
+			children = (
+				B10023 /* GalleryView.swift */,
+			);
+			path = Gallery;
+			sourceTree = "<group>";
+		};
 		D10099 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -286,7 +286,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1540;
-				LastUpgradeCheck = 1540;
+				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					E10001 = {
 						CreatedOnToolsVersion = 15.4;
@@ -360,6 +360,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -390,6 +391,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = QDUKRQ9C38;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -412,6 +414,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -422,6 +425,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -452,6 +456,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = QDUKRQ9C38;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -467,6 +472,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -479,7 +485,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = QDUKRQ9C38;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SplitCam;
@@ -510,7 +515,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = QDUKRQ9C38;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SplitCam;
