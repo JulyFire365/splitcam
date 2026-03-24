@@ -48,6 +48,11 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
     var onFrontFrame: ((CMSampleBuffer) -> Void)?
     var onBackFrame: ((CMSampleBuffer) -> Void)?
+    var onAudioSample: ((CMSampleBuffer) -> Void)?
+
+    /// 数据输出队列上的帧回调（用于录制，避免主线程跳转延迟）
+    var onFrontFrameForRecording: ((CMSampleBuffer) -> Void)?
+    var onBackFrameForRecording: ((CMSampleBuffer) -> Void)?
 
     // MARK: - Audio Source
 
@@ -482,22 +487,26 @@ extension CameraEngine: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureA
                 isWritingStarted = true
             }
             onFrontFrame?(sampleBuffer)
+            onFrontFrameForRecording?(sampleBuffer)
 
-            // Write front video
+            // Write front video (legacy dual-recording)
             if isRecording && isWritingStarted,
                let input = frontVideoWriterInput, input.isReadyForMoreMediaData {
                 input.append(sampleBuffer)
             }
         } else if output == backVideoOutput {
             onBackFrame?(sampleBuffer)
+            onBackFrameForRecording?(sampleBuffer)
 
-            // Write back video
+            // Write back video (legacy dual-recording)
             if isRecording && isWritingStarted,
                let input = backVideoWriterInput, input.isReadyForMoreMediaData {
                 input.append(sampleBuffer)
             }
         } else if output == audioOutput {
-            // Write audio
+            onAudioSample?(sampleBuffer)
+
+            // Write audio (legacy dual-recording)
             if isRecording && isWritingStarted,
                let input = audioWriterInput, input.isReadyForMoreMediaData {
                 input.append(sampleBuffer)

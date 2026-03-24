@@ -12,7 +12,10 @@ final class CameraViewModel: ObservableObject {
 
     @Published var isRecording = false
     @Published var splitMode: SplitMode = .leftRight {
-        didSet { layoutEngine.splitMode = splitMode }
+        didSet {
+            layoutEngine.splitMode = splitMode
+            syncRecordingSnapshot()
+        }
     }
     @Published var shootingMode: ShootingMode = .video
     @Published var aspectRatio: AspectRatioMode = .ratio9_16
@@ -37,15 +40,12 @@ final class CameraViewModel: ObservableObject {
     let layoutEngine = SplitLayoutEngine()
     let cameraEngine = CameraEngine()
     let mediaImporter = MediaImporter()
-    private let videoComposer = VideoComposer()
 
     // MARK: - State
 
     private var captureMode: CaptureMode = .dualCamera
     var importedPlayer: AVPlayer?
 
-    private var recordedFrontURL: URL?
-    private var recordedBackURL: URL?
     private var frontReady = false
     private var backReady = false
     private var frontFrameCount = 0
@@ -53,13 +53,38 @@ final class CameraViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
+    // MARK: - Real-time Composed Recording
+
+    private let recordingQueue = DispatchQueue(label: "com.splitcam.recording")
+    nonisolated(unsafe) private var composedWriter: AVAssetWriter?
+    nonisolated(unsafe) private var composedVideoInput: AVAssetWriterInput?
+    nonisolated(unsafe) private var composedAudioInput: AVAssetWriterInput?
+    nonisolated(unsafe) private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
+    private var composedOutputURL: URL?
+    nonisolated(unsafe) private var recordingCIContext = CIContext(options: [.useSoftwareRenderer: false])
+    nonisolated(unsafe) private var recordingStartTime: CMTime?
+    nonisolated(unsafe) private var isWritingStarted = false
+
+    // 最新帧缓存（录制用，在 dataOutputQueue 上访问）
+    nonisolated(unsafe) private var latestFrontPixelBuffer: CVPixelBuffer?
+    nonisolated(unsafe) private var latestBackPixelBuffer: CVPixelBuffer?
+
+    // 布局快照（主线程更新，录制线程读取）
+    nonisolated(unsafe) private var recOutputSize: CGSize = CGSize(width: 1080, height: 1920)
+    nonisolated(unsafe) private var recSplitMode: SplitMode = .leftRight
+    nonisolated(unsafe) private var recSplitRatio: CGFloat = 0.5
+    nonisolated(unsafe) private var recPanelsSwapped: Bool = false
+    nonisolated(unsafe) private var recPipShape: PipShape = .roundedRect
+    nonisolated(unsafe) private var recPipScale: CGFloat = 0.3
+    nonisolated(unsafe) private var recPipOffset: CGSize = .zero
+    nonisolated(unsafe) private var recBorderStyle: BorderStyleConfig = .default
+
     // MARK: - Computed
 
     var formattedDuration: String {
         let minutes = Int(recordingDuration) / 60
         let seconds = Int(recordingDuration) % 60
-        let tenths = Int((recordingDuration.truncatingRemainder(dividingBy: 1)) * 10)
-        return String(format: "%02d:%02d.%d", minutes, seconds, tenths)
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 
     // MARK: - Setup
@@ -112,6 +137,32 @@ final class CameraViewModel: ObservableObject {
                 }
             }
         }
+
+        // 录制用帧回调（在 dataOutputQueue 上，不跳主线程）
+        cameraEngine.onFrontFrameForRecording = { [weak self] buffer in
+            guard let self else { return }
+            self.latestFrontPixelBuffer = CMSampleBufferGetImageBuffer(buffer)
+        }
+
+        cameraEngine.onBackFrameForRecording = { [weak self] buffer in
+            guard let self else { return }
+            self.latestBackPixelBuffer = CMSampleBufferGetImageBuffer(buffer)
+            // 以后摄帧为基准触发合成写入
+            self.composeAndWriteFrame(timestamp: CMSampleBufferGetPresentationTimeStamp(buffer))
+        }
+
+        cameraEngine.onAudioSample = { [weak self] buffer in
+            guard let self else { return }
+            self.writeAudioSample(buffer)
+        }
+
+        // 布局变化同步到录制快照
+        layoutEngine.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.syncRecordingSnapshot()
+            }
+            .store(in: &cancellables)
 
         // PiP 点击交换画面
         NotificationCenter.default.publisher(for: .splitCamSwapPanels)
@@ -167,6 +218,18 @@ final class CameraViewModel: ObservableObject {
         }
     }
 
+    /// 同步布局参数到录制线程可访问的快照
+    func syncRecordingSnapshot() {
+        recOutputSize = aspectRatio.exportSize
+        recSplitMode = splitMode
+        recSplitRatio = layoutEngine.splitRatio
+        recPanelsSwapped = panelsSwapped
+        recPipShape = layoutEngine.pipShape
+        recPipScale = layoutEngine.pipScale
+        recPipOffset = layoutEngine.pipOffset
+        recBorderStyle = layoutEngine.borderStyle
+    }
+
     func openSystemPhotos() {
         if let url = URL(string: "photos-redirect://") {
             UIApplication.shared.open(url)
@@ -182,8 +245,8 @@ final class CameraViewModel: ObservableObject {
     // MARK: - Aspect Ratio
 
     func setAspectRatio(_ ratio: AspectRatioMode) {
-        guard !isRecording else { return }
         aspectRatio = ratio
+        syncRecordingSnapshot()
     }
 
     // MARK: - Zoom
@@ -371,7 +434,7 @@ final class CameraViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Video Recording
+    // MARK: - Video Recording (Real-time Composition)
 
     func toggleRecording() {
         if isRecording {
@@ -382,59 +445,267 @@ final class CameraViewModel: ObservableObject {
     }
 
     private func startRecording() {
-        cameraEngine.startRecording()
+        syncRecordingSnapshot()
+        let outputSize = aspectRatio.exportSize
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("splitcam_composed_\(UUID().uuidString).mp4")
+        composedOutputURL = outputURL
+
+        do {
+            let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+
+            let videoSettings: [String: Any] = [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: Int(outputSize.width),
+                AVVideoHeightKey: Int(outputSize.height),
+                AVVideoCompressionPropertiesKey: [
+                    AVVideoAverageBitRateKey: 8_000_000,
+                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
+                ]
+            ]
+
+            let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+            videoInput.expectsMediaDataInRealTime = true
+
+            let sourcePixelAttrs: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: Int(outputSize.width),
+                kCVPixelBufferHeightKey as String: Int(outputSize.height)
+            ]
+            let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+                assetWriterInput: videoInput,
+                sourcePixelBufferAttributes: sourcePixelAttrs
+            )
+
+            let audioSettings: [String: Any] = [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: 44100,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderBitRateKey: 128000
+            ]
+            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+            audioInput.expectsMediaDataInRealTime = true
+
+            writer.add(videoInput)
+            writer.add(audioInput)
+            writer.startWriting()
+
+            composedWriter = writer
+            composedVideoInput = videoInput
+            composedAudioInput = audioInput
+            pixelBufferAdaptor = adaptor
+            recordingStartTime = nil
+            isWritingStarted = false
+        } catch {
+            errorMessage = "录制初始化失败: \(error.localizedDescription)"
+            showError = true
+            return
+        }
+
+        isRecording = true
+        recordingDuration = 0
+
+        // 录制计时器
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            if !self.isRecording {
+                timer.invalidate()
+                return
+            }
+            self.recordingDuration += 1
+        }
+
         if captureMode == .importAndShoot {
             mediaImporter.startPlayback()
         }
     }
 
+    /// 实时合成一帧并写入（在 dataOutputQueue 上调用）
+    private nonisolated func composeAndWriteFrame(timestamp: CMTime) {
+        guard let writer = composedWriter,
+              writer.status == .writing,
+              let videoInput = composedVideoInput,
+              let adaptor = pixelBufferAdaptor,
+              let frontPB = latestFrontPixelBuffer,
+              let backPB = latestBackPixelBuffer else { return }
+
+        // 首帧启动 session
+        if !isWritingStarted {
+            writer.startSession(atSourceTime: timestamp)
+            recordingStartTime = timestamp
+            isWritingStarted = true
+        }
+
+        guard videoInput.isReadyForMoreMediaData else { return }
+
+        // 从快照读取当前布局参数（nonisolated(unsafe) 属性，主线程更新）
+        let currentOutputSize = recOutputSize
+        let currentSplitMode = recSplitMode
+        let currentSplitRatio = recSplitRatio
+        let currentPanelsSwapped = recPanelsSwapped
+        let currentPipShape = recPipShape
+        let currentPipScale = recPipScale
+        let currentPipOffset = recPipOffset
+        let currentBorderStyle = recBorderStyle
+
+        // 选择前后摄对应的 pixel buffer
+        let firstPB = currentPanelsSwapped ? frontPB : backPB
+        let secondPB = currentPanelsSwapped ? backPB : frontPB
+
+        // 计算目标区域
+        let frames: (first: CGRect, second: CGRect)
+        if currentSplitMode == .pip {
+            // 临时 layout engine 计算 PiP rect
+            let pipWidth = currentOutputSize.width * currentPipScale
+            let pipHeight = pipWidth * (4.0 / 3.0)
+            let margin: CGFloat = 16
+            let defaultX = currentOutputSize.width - pipWidth - margin
+            let defaultY = margin + 50
+            var x = defaultX + currentPipOffset.width
+            var y = defaultY + currentPipOffset.height
+            x = max(margin, min(currentOutputSize.width - pipWidth - margin, x))
+            y = max(margin, min(currentOutputSize.height - pipHeight - margin, y))
+            let pipRect = CGRect(x: x, y: y, width: pipWidth, height: pipHeight)
+            frames = (CGRect(origin: .zero, size: currentOutputSize), pipRect)
+        } else {
+            let bw = currentBorderStyle.style != .none ? currentBorderStyle.width : 0
+            switch currentSplitMode {
+            case .leftRight:
+                let fw = currentOutputSize.width * currentSplitRatio - bw / 2
+                let sx = currentOutputSize.width * currentSplitRatio + bw / 2
+                let sw = currentOutputSize.width - sx
+                frames = (CGRect(x: 0, y: 0, width: fw, height: currentOutputSize.height),
+                          CGRect(x: sx, y: 0, width: sw, height: currentOutputSize.height))
+            case .topBottom:
+                let fh = currentOutputSize.height * currentSplitRatio - bw / 2
+                let sy = currentOutputSize.height * currentSplitRatio + bw / 2
+                let sh = currentOutputSize.height - sy
+                frames = (CGRect(x: 0, y: 0, width: currentOutputSize.width, height: fh),
+                          CGRect(x: 0, y: sy, width: currentOutputSize.width, height: sh))
+            case .pip:
+                frames = (CGRect(origin: .zero, size: currentOutputSize), .zero)
+            }
+        }
+
+        // 用 CIImage 合成
+        let firstCI = CIImage(cvPixelBuffer: firstPB)
+        let secondCI = CIImage(cvPixelBuffer: secondPB)
+
+        var composite = CIImage(color: .black).cropped(to: CGRect(origin: .zero, size: currentOutputSize))
+        let h = currentOutputSize.height
+
+        composite = fitAndClip(firstCI, into: frames.first, outputHeight: h).composited(over: composite)
+
+        let fittedSecond = fitAndClip(secondCI, into: frames.second, outputHeight: h)
+        if currentSplitMode == .pip {
+            let masked = applyPipMaskForRecording(fittedSecond, rect: frames.second, shape: currentPipShape, outputHeight: h)
+            composite = masked.composited(over: composite)
+        } else {
+            composite = fittedSecond.composited(over: composite)
+        }
+
+        // 渲染到 pixel buffer
+        guard let pool = adaptor.pixelBufferPool else { return }
+        var outputBuffer: CVPixelBuffer?
+        CVPixelBufferPoolCreatePixelBuffer(nil, pool, &outputBuffer)
+        guard let buffer = outputBuffer else { return }
+
+        recordingCIContext.render(composite, to: buffer)
+        adaptor.append(buffer, withPresentationTime: timestamp)
+    }
+
+    private nonisolated func writeAudioSample(_ buffer: CMSampleBuffer) {
+        guard let writer = composedWriter,
+              writer.status == .writing,
+              isWritingStarted,
+              let audioInput = composedAudioInput,
+              audioInput.isReadyForMoreMediaData else { return }
+        audioInput.append(buffer)
+    }
+
+    /// CIImage aspect fill + clip（与 VideoComposer 中相同逻辑）
+    private nonisolated func fitAndClip(_ image: CIImage, into targetRect: CGRect, outputHeight: CGFloat) -> CIImage {
+        let imageSize = image.extent.size
+        guard targetRect.width > 0, targetRect.height > 0 else {
+            return CIImage(color: .clear).cropped(to: .zero)
+        }
+
+        let scaleX = targetRect.width / imageSize.width
+        let scaleY = targetRect.height / imageSize.height
+        let scale = max(scaleX, scaleY)
+
+        let scaledW = imageSize.width * scale
+        let scaledH = imageSize.height * scale
+
+        let ciY = outputHeight - targetRect.origin.y - targetRect.height
+        let ciRect = CGRect(x: targetRect.origin.x, y: ciY, width: targetRect.width, height: targetRect.height)
+
+        let offsetX = ciRect.origin.x + (ciRect.width - scaledW) / 2
+        let offsetY = ciRect.origin.y + (ciRect.height - scaledH) / 2
+
+        return image
+            .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            .transformed(by: CGAffineTransform(translationX: offsetX, y: offsetY))
+            .cropped(to: ciRect)
+    }
+
+    /// PiP 遮罩（录制用，线程安全）
+    private nonisolated func applyPipMaskForRecording(_ image: CIImage, rect: CGRect, shape: PipShape, outputHeight: CGFloat) -> CIImage {
+        let ciY = outputHeight - rect.origin.y - rect.height
+        let ciRect = CGRect(x: rect.origin.x, y: ciY, width: rect.width, height: rect.height)
+
+        let mw = Int(rect.width), mh = Int(rect.height)
+        guard mw > 0, mh > 0 else { return image }
+
+        guard let ctx = CGContext(data: nil, width: mw, height: mh, bitsPerComponent: 8,
+                                   bytesPerRow: mw * 4, space: CGColorSpaceCreateDeviceGray(),
+                                   bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return image }
+        ctx.setFillColor(gray: 0, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: mw, height: mh))
+        ctx.setFillColor(gray: 1, alpha: 1)
+
+        if shape == .circle {
+            let s = min(CGFloat(mw), CGFloat(mh))
+            ctx.fillEllipse(in: CGRect(x: (CGFloat(mw)-s)/2, y: (CGFloat(mh)-s)/2, width: s, height: s))
+        } else {
+            let path = CGPath(roundedRect: CGRect(x: 0, y: 0, width: mw, height: mh),
+                              cornerWidth: 12, cornerHeight: 12, transform: nil)
+            ctx.addPath(path)
+            ctx.fillPath()
+        }
+
+        guard let maskCG = ctx.makeImage() else { return image }
+        let maskCI = CIImage(cgImage: maskCG)
+            .transformed(by: CGAffineTransform(translationX: ciRect.origin.x, y: ciRect.origin.y))
+
+        guard let blend = CIFilter(name: "CIBlendWithMask") else { return image }
+        blend.setValue(image, forKey: kCIInputImageKey)
+        blend.setValue(CIImage(color: .clear).cropped(to: image.extent), forKey: kCIInputBackgroundImageKey)
+        blend.setValue(maskCI, forKey: kCIInputMaskImageKey)
+        return blend.outputImage ?? image
+    }
+
     private func stopRecording() {
-        Task {
-            if captureMode == .importAndShoot {
-                mediaImporter.stopPlayback()
-            }
+        guard isRecording else { return }
+        isRecording = false
 
-            guard let urls = await cameraEngine.stopRecording() else { return }
-            recordedFrontURL = urls.front
-            recordedBackURL = urls.back
+        if captureMode == .importAndShoot {
+            mediaImporter.stopPlayback()
+        }
 
-            let videoA: URL
-            let videoB: URL
+        // 完成写入并保存
+        composedVideoInput?.markAsFinished()
+        composedAudioInput?.markAsFinished()
 
-            switch captureMode {
-            case .dualCamera:
-                videoA = panelsSwapped ? urls.front : urls.back
-                videoB = panelsSwapped ? urls.back : urls.front
-            case .importAndShoot:
-                guard let imported = mediaImporter.importedVideoURL else { return }
-                videoA = panelsSwapped ? urls.back : imported
-                videoB = panelsSwapped ? imported : urls.back
-            }
+        guard let writer = composedWriter, let outputURL = composedOutputURL else { return }
 
-            // Compose split-screen video then save to album
-            isProcessing = true
-
-            // PiP 模式下传递小窗口位置
-            let pipRectForExport: CGRect? = splitMode == .pip
-                ? layoutEngine.pipRect(in: aspectRatio.exportSize)
-                : nil
-
-            videoComposer.compose(
-                videoA: videoA,
-                videoB: videoB,
-                splitMode: splitMode,
-                splitRatio: layoutEngine.splitRatio,
-                borderStyle: layoutEngine.borderStyle,
-                outputSize: aspectRatio.exportSize,
-                pipRect: pipRectForExport,
-                pipShape: layoutEngine.pipShape
-            ) { [weak self] result in
-                guard let self else { return }
-                switch result {
-                case .success(let composedURL):
-                    // Generate thumbnail for the button
+        writer.finishWriting { [weak self] in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                if writer.status == .completed {
+                    // 生成缩略图
                     Task {
-                        let asset = AVURLAsset(url: composedURL)
+                        let asset = AVURLAsset(url: outputURL)
                         let generator = AVAssetImageGenerator(asset: asset)
                         generator.appliesPreferredTrackTransform = true
                         generator.maximumSize = CGSize(width: 200, height: 200)
@@ -442,13 +713,17 @@ final class CameraViewModel: ObservableObject {
                             self.lastSavedThumbnail = UIImage(cgImage: cgImage)
                         }
                     }
-                    // Save composed video to system album
-                    self.saveVideoToAlbum(composedURL)
-                case .failure(let error):
-                    self.isProcessing = false
-                    self.errorMessage = error.localizedDescription
+                    self.saveVideoToAlbum(outputURL)
+                } else {
+                    self.errorMessage = "视频保存失败"
                     self.showError = true
                 }
+                self.composedWriter = nil
+                self.composedVideoInput = nil
+                self.composedAudioInput = nil
+                self.pixelBufferAdaptor = nil
+                self.isWritingStarted = false
+                self.recordingStartTime = nil
             }
         }
     }
@@ -457,6 +732,7 @@ final class CameraViewModel: ObservableObject {
 
     func swapPanels() {
         panelsSwapped.toggle()
+        syncRecordingSnapshot()
     }
 
     func handlePickedVideo(_ result: PHPickerResult) {
