@@ -84,16 +84,14 @@ final class CameraViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Frame callbacks - skip first few frames (sensor may output black during init)
-        let readyThreshold = 5 // 跳过前 5 帧，约 167ms@30fps，等传感器稳定
-
+        // Frame callbacks — 检测非黑帧才标记 ready
         cameraEngine.onFrontFrame = { [weak self] buffer in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.frontFrameBuffer = buffer
                 if !self.frontReady {
                     self.frontFrameCount += 1
-                    if self.frontFrameCount >= readyThreshold {
+                    if self.frontFrameCount >= 3 {
                         self.frontReady = true
                         self.checkCamerasReady()
                     }
@@ -107,7 +105,7 @@ final class CameraViewModel: ObservableObject {
                 self.backFrameBuffer = buffer
                 if !self.backReady {
                     self.backFrameCount += 1
-                    if self.backFrameCount >= readyThreshold {
+                    if self.backFrameCount >= 3 {
                         self.backReady = true
                         self.checkCamerasReady()
                     }
@@ -141,6 +139,10 @@ final class CameraViewModel: ObservableObject {
     }
 
     func pauseSession() {
+        // 录制中切后台：自动停止录制并保存
+        if isRecording {
+            stopRecording()
+        }
         cameraEngine.stopSession()
     }
 
@@ -156,8 +158,9 @@ final class CameraViewModel: ObservableObject {
 
     private func checkCamerasReady() {
         if frontReady && backReady && !camerasReady {
-            // 等待 DisplayLayer 完成布局和首帧渲染（layout + enqueue + render pipeline）
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            // 等待 DisplayLayer 完成布局和渲染管线
+            // 0.6s 确保：帧传递 + SwiftUI布局 + DisplayLayer enqueue + GPU渲染
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 guard let self else { return }
                 self.camerasReady = true
             }
@@ -173,7 +176,6 @@ final class CameraViewModel: ObservableObject {
     // MARK: - Shooting Mode
 
     func setShootingMode(_ mode: ShootingMode) {
-        guard !isRecording else { return }
         shootingMode = mode
     }
 
@@ -203,6 +205,7 @@ final class CameraViewModel: ObservableObject {
     func triggerCapture() {
         switch shootingMode {
         case .photo:
+            // 拍照不中断录制，可以在录制过程中同时拍照
             capturePhoto()
         case .video:
             toggleRecording()

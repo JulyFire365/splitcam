@@ -12,12 +12,24 @@ struct CameraView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // 全屏分屏预览（圆角）
-            splitPreview
-                .ignoresSafeArea()
+            // 主布局：预览区 + 底部控制区
+            VStack(spacing: 0) {
+                // 顶部控制条
+                topBar
+                    .padding(.top, 8)
+
+                // 中间：分屏预览（自适应高度，不覆盖底部控制）
+                splitPreview
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 4)
+
+                Spacer(minLength: 0)
+
+                // 底部控制区（始终在预览下方）
+                bottomControls
+            }
 
             // 摄像头未就绪时的黑色蒙版
-            // opacity 实现：未就绪时立刻全黑，就绪后平滑淡出
             Color.black
                 .ignoresSafeArea()
                 .opacity(viewModel.camerasReady ? 0 : 1)
@@ -36,13 +48,6 @@ struct CameraView: View {
             // 处理中蒙版
             if viewModel.isProcessing {
                 processingOverlay
-            }
-
-            // 控制层 (四角布局)
-            VStack(spacing: 0) {
-                topBar
-                Spacer()
-                bottomControls
             }
         }
         .navigationBarHidden(true)
@@ -95,7 +100,7 @@ struct CameraView: View {
         }
     }
 
-    // MARK: - Full Screen Split Preview
+    // MARK: - Split Preview
 
     private var splitPreview: some View {
         GeometryReader { geo in
@@ -133,8 +138,18 @@ struct CameraView: View {
 
     private var topBar: some View {
         HStack(alignment: .top) {
-            // 左上角: 占位
-            Color.clear.frame(width: 40, height: 40)
+            // 左上角: 导入
+            if !viewModel.isRecording {
+                Button(action: { viewModel.showVideoPicker = true }) {
+                    Image(systemName: "photo.badge.plus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(.black.opacity(0.35)))
+                }
+            } else {
+                Color.clear.frame(width: 40, height: 40)
+            }
 
             Spacer()
 
@@ -167,30 +182,10 @@ struct CameraView: View {
 
             Spacer()
 
-            // 右上角: 翻转 + 模式切换
-            VStack(spacing: 10) {
-                Button(action: { viewModel.toggleMirror() }) {
-                    Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(Circle().fill(.black.opacity(0.35)))
-                }
-
-                // 导入模式切换
-                if !viewModel.isRecording {
-                    Button(action: { viewModel.showVideoPicker = true }) {
-                        Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .background(Circle().fill(.black.opacity(0.35)))
-                    }
-                }
-            }
+            // 右上角: 最近缩略图
+            lastMediaButton
         }
         .padding(.horizontal, 16)
-        .padding(.top, 12)
     }
 
     // MARK: - Aspect Ratio Bar
@@ -222,7 +217,7 @@ struct CameraView: View {
     // MARK: - Bottom Controls
 
     private var bottomControls: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             // Recording timer
             if viewModel.isRecording {
                 HStack(spacing: 6) {
@@ -238,48 +233,38 @@ struct CameraView: View {
                 .background(Capsule().fill(.black.opacity(0.5)))
             }
 
-            // Zoom controls
-            zoomBar
-
-            // Shooting mode toggle
-            if !viewModel.isRecording {
-                shootingModeBar
-            }
-
-            // Main action row
-            HStack {
-                // 左下: 交换镜头
+            // Zoom + 翻转行
+            HStack(spacing: 12) {
+                // 交换镜头
                 Button(action: { viewModel.swapPanels() }) {
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 20, weight: .medium))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(width: 50, height: 50)
-                        .background(Circle().fill(.black.opacity(0.35)))
+                        .frame(width: 38, height: 38)
+                        .background(Circle().fill(.black.opacity(0.3)))
                 }
-                .disabled(viewModel.isRecording)
 
-                Spacer()
+                // Zoom buttons
+                zoomBar
 
-                // 中间: 拍摄按钮
-                captureButton
-
-                Spacer()
-
-                // 右下: 最近一张缩略图
-                lastMediaButton
+                // 翻转
+                Button(action: { viewModel.toggleMirror() }) {
+                    Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(width: 38, height: 38)
+                        .background(Circle().fill(.black.opacity(0.3)))
+                }
             }
-            .padding(.horizontal, 30)
-            .padding(.bottom, 25)
+
+            // 拍照/拍摄模式切换（始终显示，录制中也可切换）
+            shootingModeBar
+
+            // 拍摄按钮
+            captureButton
+                .padding(.bottom, 20)
         }
-        .padding(.top, 10)
-        .background(
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.4), .black.opacity(0.6)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(edges: .bottom)
-        )
+        .padding(.top, 8)
     }
 
     // MARK: - Zoom Bar
@@ -358,15 +343,15 @@ struct CameraView: View {
                     Image(uiImage: lastThumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 50, height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 8)
                                 .stroke(.white.opacity(0.5), lineWidth: 1.5)
                         )
                 }
             } else {
-                Color.clear.frame(width: 50, height: 50)
+                Color.clear.frame(width: 40, height: 40)
             }
         }
     }

@@ -342,15 +342,26 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
     private func configureDevice(_ device: AVCaptureDevice, resolution: CaptureResolution) {
         try? device.lockForConfiguration()
-        if !device.activeFormat.isMultiCamSupported {
-            let formats = device.formats.filter { $0.isMultiCamSupported }
-            if let bestFormat = formats.first(where: {
-                let dims = CMVideoFormatDescriptionGetDimensions($0.formatDescription)
-                return dims.width >= resolution.width && dims.height >= resolution.height
-            }) ?? formats.last {
-                device.activeFormat = bestFormat
+
+        // 从所有多摄兼容格式中选分辨率最高的
+        let formats = device.formats
+            .filter { $0.isMultiCamSupported }
+            .sorted { a, b in
+                let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
+                let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
+                return da.width * da.height > db.width * db.height
             }
+
+        if let bestFormat = formats.first {
+            device.activeFormat = bestFormat
         }
+
+        // 提升色彩饱和度：使用 P3 广色域
+        if device.activeColorSpace != .P3_D65 &&
+           device.activeFormat.supportedColorSpaces.contains(.P3_D65) {
+            device.activeColorSpace = .P3_D65
+        }
+
         device.unlockForConfiguration()
     }
 
