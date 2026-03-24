@@ -79,11 +79,10 @@ final class CameraViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Frame callbacks - freeze frames during drag for smooth divider movement
+        // Frame callbacks - always deliver frames for real-time preview
         cameraEngine.onFrontFrame = { [weak self] buffer in
             DispatchQueue.main.async {
                 guard let self else { return }
-                guard !self.isDraggingDivider else { return }
                 self.frontFrameBuffer = buffer
             }
         }
@@ -91,7 +90,6 @@ final class CameraViewModel: ObservableObject {
         cameraEngine.onBackFrame = { [weak self] buffer in
             DispatchQueue.main.async {
                 guard let self else { return }
-                guard !self.isDraggingDivider else { return }
                 self.backFrameBuffer = buffer
             }
         }
@@ -111,6 +109,10 @@ final class CameraViewModel: ObservableObject {
     func cleanup() {
         cameraEngine.stopSession()
         mediaImporter.stopPlayback()
+    }
+
+    func pauseSession() {
+        cameraEngine.stopSession()
     }
 
     func resumeSession() {

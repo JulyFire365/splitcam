@@ -46,8 +46,13 @@ struct CameraView: View {
             viewModel.cleanup()
         }
         .onChange(of: scenePhase) { newPhase in
-            if newPhase == .active {
+            switch newPhase {
+            case .active:
                 viewModel.resumeSession()
+            case .background, .inactive:
+                viewModel.pauseSession()
+            @unknown default:
+                break
             }
         }
         .sheet(isPresented: $viewModel.showVideoPicker) {

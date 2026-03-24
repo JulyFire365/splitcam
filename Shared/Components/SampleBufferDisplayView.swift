@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import CoreMedia
 
 /// 用于显示 CMSampleBuffer 的 UIKit 视图（Metal 渲染）
 struct SampleBufferDisplayView: UIViewRepresentable {
@@ -10,12 +11,13 @@ struct SampleBufferDisplayView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: SampleBufferDisplayUIView, context: Context) {
-        uiView.displayLayer.enqueue(sampleBuffer)
+        uiView.enqueueIfNew(sampleBuffer)
     }
 }
 
 class SampleBufferDisplayUIView: UIView {
     let displayLayer = AVSampleBufferDisplayLayer()
+    private var lastTimestamp: CMTime = .invalid
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -32,8 +34,18 @@ class SampleBufferDisplayUIView: UIView {
         layer.addSublayer(displayLayer)
     }
 
+    func enqueueIfNew(_ buffer: CMSampleBuffer) {
+        let pts = CMSampleBufferGetPresentationTimeStamp(buffer)
+        guard pts != lastTimestamp else { return }
+        lastTimestamp = pts
+        displayLayer.enqueue(buffer)
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         displayLayer.frame = bounds
+        CATransaction.commit()
     }
 }

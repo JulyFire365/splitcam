@@ -106,8 +106,10 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
     func startSession() {
         sessionQueue.async { [weak self] in
-            guard let self, !self.multiCamSession.isRunning else { return }
-            self.multiCamSession.startRunning()
+            guard let self else { return }
+            if !self.multiCamSession.isRunning {
+                self.multiCamSession.startRunning()
+            }
             DispatchQueue.main.async {
                 self.isRunning = true
             }
@@ -116,8 +118,10 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
     func stopSession() {
         sessionQueue.async { [weak self] in
-            guard let self, self.multiCamSession.isRunning else { return }
-            self.multiCamSession.stopRunning()
+            guard let self else { return }
+            if self.multiCamSession.isRunning {
+                self.multiCamSession.stopRunning()
+            }
             DispatchQueue.main.async {
                 self.isRunning = false
             }
@@ -168,25 +172,19 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             guard let self else { return }
             guard let device = self.backDeviceInput?.device else { return }
 
-            // Map ZoomLevel to actual device zoom factor
-            // On wide-angle camera, min is typically 1.0
-            // 0.5x = use minimum zoom (as close to wide as possible)
-            // 1.0x = standard
-            // 3.0x = telephoto
             let factor: CGFloat
             switch level {
             case .ultraWide:
-                // Use the device's minimum available zoom (may support < 1.0 on some devices)
                 factor = device.minAvailableVideoZoomFactor
             case .wide:
-                factor = 1.0
+                factor = max(1.0, device.minAvailableVideoZoomFactor)
             case .telephoto:
                 factor = min(3.0, device.maxAvailableVideoZoomFactor)
             }
 
             do {
                 try device.lockForConfiguration()
-                device.ramp(toVideoZoomFactor: factor, withRate: 8.0)
+                device.videoZoomFactor = factor
                 device.unlockForConfiguration()
             } catch {
                 // Ignore zoom errors silently
