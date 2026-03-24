@@ -62,6 +62,14 @@ struct CameraView: View {
         }
     }
 
+    private func splitModeIcon(_ mode: SplitMode) -> String {
+        switch mode {
+        case .leftRight: return "rectangle.split.2x1"
+        case .topBottom: return "rectangle.split.1x2"
+        case .pip: return "pip"
+        }
+    }
+
     // MARK: - Processing Overlay
 
     private var processingOverlay: some View {
@@ -129,9 +137,7 @@ struct CameraView: View {
                         Button {
                             viewModel.splitMode = splitMode
                         } label: {
-                            Image(systemName: splitMode == .leftRight
-                                  ? "rectangle.split.2x1"
-                                  : "rectangle.split.1x2")
+                            Image(systemName: splitModeIcon(splitMode))
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(viewModel.splitMode == splitMode ? .white : .white.opacity(0.5))
                                 .padding(.horizontal, 12)

@@ -21,8 +21,16 @@ enum CaptureMode: String, Hashable {
 enum SplitMode: String, CaseIterable, Identifiable {
     case leftRight = "左右分屏"
     case topBottom = "上下分屏"
+    case pip = "画中画"
 
     var id: String { rawValue }
+}
+
+// MARK: - PiP Shape
+
+enum PipShape: String, CaseIterable {
+    case roundedRect = "矩形"
+    case circle = "圆形"
 }
 
 // MARK: - Shooting Mode

@@ -94,6 +94,14 @@ final class CameraViewModel: ObservableObject {
             }
         }
 
+        // PiP 点击交换画面
+        NotificationCenter.default.publisher(for: .splitCamSwapPanels)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.swapPanels()
+            }
+            .store(in: &cancellables)
+
         Task {
             let granted = await cameraEngine.checkPermissions()
             guard granted else {
@@ -203,26 +211,77 @@ final class CameraViewModel: ObservableObject {
         return renderer.image { context in
             let frames = layoutEngine.frames(in: outputSize)
 
-            drawImage(first, in: frames.first, context: context.cgContext)
-            drawImage(second, in: frames.second, context: context.cgContext)
+            if splitMode == .pip {
+                // PiP: 全屏背景 + 小窗口叠加
+                drawImage(first, in: frames.first, context: context.cgContext)
+                drawPipImage(second, in: frames.second, context: context.cgContext)
+            } else {
+                drawImage(first, in: frames.first, context: context.cgContext)
+                drawImage(second, in: frames.second, context: context.cgContext)
 
-            if layoutEngine.borderStyle.style != .none {
-                let borderColor = UIColor(layoutEngine.borderStyle.color)
-                context.cgContext.setStrokeColor(borderColor.cgColor)
-                context.cgContext.setLineWidth(layoutEngine.borderStyle.width)
+                if layoutEngine.borderStyle.style != .none {
+                    let borderColor = UIColor(layoutEngine.borderStyle.color)
+                    context.cgContext.setStrokeColor(borderColor.cgColor)
+                    context.cgContext.setLineWidth(layoutEngine.borderStyle.width)
 
-                switch splitMode {
-                case .leftRight:
-                    let x = outputSize.width * layoutEngine.splitRatio
-                    context.cgContext.move(to: CGPoint(x: x, y: 0))
-                    context.cgContext.addLine(to: CGPoint(x: x, y: outputSize.height))
-                case .topBottom:
-                    let y = outputSize.height * layoutEngine.splitRatio
-                    context.cgContext.move(to: CGPoint(x: 0, y: y))
-                    context.cgContext.addLine(to: CGPoint(x: outputSize.width, y: y))
+                    switch splitMode {
+                    case .leftRight:
+                        let x = outputSize.width * layoutEngine.splitRatio
+                        context.cgContext.move(to: CGPoint(x: x, y: 0))
+                        context.cgContext.addLine(to: CGPoint(x: x, y: outputSize.height))
+                    case .topBottom:
+                        let y = outputSize.height * layoutEngine.splitRatio
+                        context.cgContext.move(to: CGPoint(x: 0, y: y))
+                        context.cgContext.addLine(to: CGPoint(x: outputSize.width, y: y))
+                    case .pip:
+                        break
+                    }
+                    context.cgContext.strokePath()
                 }
-                context.cgContext.strokePath()
             }
+        }
+    }
+
+    /// 绘制画中画小窗口（带圆角/圆形裁切和边框）
+    private func drawPipImage(_ image: UIImage, in rect: CGRect, context: CGContext) {
+        context.saveGState()
+
+        // 根据形状裁切
+        if layoutEngine.pipShape == .circle {
+            let size = min(rect.width, rect.height)
+            let circleRect = CGRect(
+                x: rect.midX - size / 2,
+                y: rect.midY - size / 2,
+                width: size,
+                height: size
+            )
+            context.addEllipse(in: circleRect)
+            context.clip()
+            drawImage(image, in: circleRect, context: context)
+            context.restoreGState()
+
+            // 边框
+            context.saveGState()
+            context.setStrokeColor(UIColor.white.withAlphaComponent(0.6).cgColor)
+            context.setLineWidth(1.5)
+            context.addEllipse(in: circleRect)
+            context.strokePath()
+            context.restoreGState()
+        } else {
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: 12)
+            context.addPath(path.cgPath)
+            context.clip()
+            drawImage(image, in: rect, context: context)
+            context.restoreGState()
+
+            // 边框
+            context.saveGState()
+            context.setStrokeColor(UIColor.white.withAlphaComponent(0.6).cgColor)
+            context.setLineWidth(1.5)
+            let borderPath = UIBezierPath(roundedRect: rect, cornerRadius: 12)
+            context.addPath(borderPath.cgPath)
+            context.strokePath()
+            context.restoreGState()
         }
     }
 
@@ -314,13 +373,21 @@ final class CameraViewModel: ObservableObject {
 
             // Compose split-screen video then save to album
             isProcessing = true
+
+            // PiP 模式下传递小窗口位置
+            let pipRectForExport: CGRect? = splitMode == .pip
+                ? layoutEngine.pipRect(in: aspectRatio.exportSize)
+                : nil
+
             videoComposer.compose(
                 videoA: videoA,
                 videoB: videoB,
                 splitMode: splitMode,
                 splitRatio: layoutEngine.splitRatio,
                 borderStyle: layoutEngine.borderStyle,
-                outputSize: aspectRatio.exportSize
+                outputSize: aspectRatio.exportSize,
+                pipRect: pipRectForExport,
+                pipShape: layoutEngine.pipShape
             ) { [weak self] result in
                 guard let self else { return }
                 switch result {
@@ -367,4 +434,5 @@ final class CameraViewModel: ObservableObject {
 
 extension Notification.Name {
     static let splitCamNavigateToEditor = Notification.Name("splitCamNavigateToEditor")
+    static let splitCamSwapPanels = Notification.Name("splitCamSwapPanels")
 }

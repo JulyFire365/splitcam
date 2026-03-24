@@ -9,6 +9,14 @@ final class SplitLayoutEngine: ObservableObject {
     @Published var splitRatio: CGFloat = 0.5  // 0.0~1.0, 第一个画面占比
     @Published var borderStyle: BorderStyleConfig = .default
 
+    // PiP 相关状态
+    @Published var pipShape: PipShape = .roundedRect
+    @Published var pipScale: CGFloat = 0.3        // 小窗口占屏幕宽度的比例 (0.2~0.5)
+    @Published var pipOffset: CGSize = .zero       // 小窗口相对默认位置(右上角)的偏移
+
+    static let pipMinScale: CGFloat = 0.2
+    static let pipMaxScale: CGFloat = 0.5
+
     // MARK: - Constraints
 
     static let minRatio: CGFloat = 0.2
@@ -44,7 +52,34 @@ final class SplitLayoutEngine: ObservableObject {
                 height: secondHeight
             )
             return (first, second)
+
+        case .pip:
+            let first = CGRect(x: 0, y: 0, width: containerSize.width, height: containerSize.height)
+            let second = pipRect(in: containerSize)
+            return (first, second)
         }
+    }
+
+    /// 画中画小窗口的 frame
+    func pipRect(in containerSize: CGSize) -> CGRect {
+        let clampedScale = min(Self.pipMaxScale, max(Self.pipMinScale, pipScale))
+        let pipWidth = containerSize.width * clampedScale
+        let pipHeight = pipWidth * (4.0 / 3.0) // 4:3 比例小窗口
+
+        let margin: CGFloat = 16
+        // 默认右上角位置
+        let defaultX = containerSize.width - pipWidth - margin
+        let defaultY = margin + 50 // 留出顶部控制栏空间
+
+        // 加上用户拖拽偏移
+        var x = defaultX + pipOffset.width
+        var y = defaultY + pipOffset.height
+
+        // 限制在屏幕范围内
+        x = max(margin, min(containerSize.width - pipWidth - margin, x))
+        y = max(margin, min(containerSize.height - pipHeight - margin, y))
+
+        return CGRect(x: x, y: y, width: pipWidth, height: pipHeight)
     }
 
     /// 分割线的位置和大小
@@ -60,6 +95,9 @@ final class SplitLayoutEngine: ObservableObject {
         case .topBottom:
             let y = containerSize.height * clampedRatio - hitAreaExtra / 2
             return CGRect(x: 0, y: y, width: containerSize.width, height: borderStyle.width + hitAreaExtra)
+
+        case .pip:
+            return pipRect(in: containerSize)
         }
     }
 
@@ -72,6 +110,8 @@ final class SplitLayoutEngine: ObservableObject {
         case .topBottom:
             let delta = dragTranslation.height / containerSize.height
             splitRatio = min(Self.maxRatio, max(Self.minRatio, splitRatio + delta))
+        case .pip:
+            break // PiP 模式不使用 splitRatio
         }
     }
 
@@ -88,6 +128,8 @@ final class SplitLayoutEngine: ObservableObject {
             let first = CGRect(x: 0, y: 0, width: 1, height: clampedRatio)
             let second = CGRect(x: 0, y: clampedRatio, width: 1, height: 1 - clampedRatio)
             return (first, second)
+        case .pip:
+            return (CGRect(x: 0, y: 0, width: 1, height: 1), CGRect.zero)
         }
     }
 }

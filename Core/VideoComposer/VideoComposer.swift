@@ -17,19 +17,25 @@ class SplitScreenInstruction: NSObject, AVVideoCompositionInstructionProtocol {
     let rectA: CGRect
     let rectB: CGRect
     let outputSize: CGSize
+    let isPip: Bool
+    let pipShape: PipShape
 
     init(timeRange: CMTimeRange,
          trackIDA: CMPersistentTrackID,
          trackIDB: CMPersistentTrackID,
          rectA: CGRect,
          rectB: CGRect,
-         outputSize: CGSize) {
+         outputSize: CGSize,
+         isPip: Bool = false,
+         pipShape: PipShape = .roundedRect) {
         self.timeRange = timeRange
         self.trackIDA = trackIDA
         self.trackIDB = trackIDB
         self.rectA = rectA
         self.rectB = rectB
         self.outputSize = outputSize
+        self.isPip = isPip
+        self.pipShape = pipShape
         self.requiredSourceTrackIDs = [
             NSNumber(value: trackIDA),
             NSNumber(value: trackIDB)
@@ -78,7 +84,15 @@ class SplitScreenCompositor: NSObject, AVVideoCompositing {
         if let bufferB = request.sourceFrame(byTrackID: instruction.trackIDB) {
             let imageB = CIImage(cvPixelBuffer: bufferB)
             let fittedB = fitAndClip(imageB, into: instruction.rectB, outputHeight: outputSize.height)
-            composite = fittedB.composited(over: composite)
+
+            if instruction.isPip {
+                // PiP: 用圆角/圆形遮罩裁切小窗口
+                let masked = applyPipMask(fittedB, rect: instruction.rectB,
+                                          shape: instruction.pipShape, outputHeight: outputSize.height)
+                composite = masked.composited(over: composite)
+            } else {
+                composite = fittedB.composited(over: composite)
+            }
         }
 
         ciContext.render(composite, to: outputBuffer)
@@ -120,6 +134,47 @@ class SplitScreenCompositor: NSObject, AVVideoCompositing {
 
         return result
     }
+
+    /// 为画中画小窗口应用圆角矩形或圆形遮罩
+    private func applyPipMask(_ image: CIImage, rect: CGRect, shape: PipShape, outputHeight: CGFloat) -> CIImage {
+        let ciY = outputHeight - rect.origin.y - rect.height
+        let ciRect = CGRect(x: rect.origin.x, y: ciY, width: rect.width, height: rect.height)
+
+        // 创建遮罩图像
+        let maskSize = CGSize(width: rect.width, height: rect.height)
+        let renderer = UIGraphicsImageRenderer(size: maskSize)
+        let maskUIImage = renderer.image { ctx in
+            ctx.cgContext.setFillColor(UIColor.black.cgColor)
+            if shape == .circle {
+                let size = min(maskSize.width, maskSize.height)
+                let circleRect = CGRect(
+                    x: (maskSize.width - size) / 2,
+                    y: (maskSize.height - size) / 2,
+                    width: size,
+                    height: size
+                )
+                ctx.cgContext.fillEllipse(in: circleRect)
+            } else {
+                let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: maskSize), cornerRadius: 12)
+                ctx.cgContext.addPath(path.cgPath)
+                ctx.cgContext.fillPath()
+            }
+        }
+
+        guard let maskCGImage = maskUIImage.cgImage else { return image }
+        let maskCI = CIImage(cgImage: maskCGImage)
+            .transformed(by: CGAffineTransform(scaleX: 1, y: -1))
+            .transformed(by: CGAffineTransform(translationX: ciRect.origin.x, y: ciRect.origin.y + ciRect.height))
+
+        // 使用 CIBlendWithMask 将遮罩应用到图像
+        guard let blendFilter = CIFilter(name: "CIBlendWithMask") else { return image }
+        let transparent = CIImage(color: .clear).cropped(to: image.extent)
+        blendFilter.setValue(image, forKey: kCIInputImageKey)
+        blendFilter.setValue(transparent, forKey: kCIInputBackgroundImageKey)
+        blendFilter.setValue(maskCI, forKey: kCIInputMaskImageKey)
+
+        return blendFilter.outputImage ?? image
+    }
 }
 
 // MARK: - Video Composer
@@ -142,6 +197,8 @@ final class VideoComposer: ObservableObject {
         splitRatio: CGFloat,
         borderStyle: BorderStyleConfig,
         outputSize: CGSize,
+        pipRect: CGRect? = nil,
+        pipShape: PipShape = .roundedRect,
         completion: @escaping (Result<URL, ComposerError>) -> Void
     ) {
         Task {
@@ -157,7 +214,9 @@ final class VideoComposer: ObservableObject {
                     splitMode: splitMode,
                     splitRatio: splitRatio,
                     borderStyle: borderStyle,
-                    outputSize: outputSize
+                    outputSize: outputSize,
+                    pipRect: pipRect,
+                    pipShape: pipShape
                 )
                 await MainActor.run {
                     self.isExporting = false
@@ -194,7 +253,9 @@ final class VideoComposer: ObservableObject {
         splitMode: SplitMode,
         splitRatio: CGFloat,
         borderStyle: BorderStyleConfig,
-        outputSize: CGSize
+        outputSize: CGSize,
+        pipRect: CGRect? = nil,
+        pipShape: PipShape = .roundedRect
     ) async throws -> URL {
         let assetA = AVURLAsset(url: videoA)
         let assetB = AVURLAsset(url: videoB)
@@ -235,12 +296,23 @@ final class VideoComposer: ObservableObject {
         }
 
         // Calculate target rects
-        let frames = calculateFrames(
-            splitMode: splitMode,
-            splitRatio: splitRatio,
-            outputSize: outputSize,
-            borderWidth: borderStyle.style != .none ? borderStyle.width : 0
-        )
+        let isPip = splitMode == .pip
+        let rectA: CGRect
+        let rectB: CGRect
+
+        if isPip, let pipRect = pipRect {
+            rectA = CGRect(origin: .zero, size: outputSize)
+            rectB = pipRect
+        } else {
+            let frames = calculateFrames(
+                splitMode: splitMode,
+                splitRatio: splitRatio,
+                outputSize: outputSize,
+                borderWidth: borderStyle.style != .none ? borderStyle.width : 0
+            )
+            rectA = frames.first
+            rectB = frames.second
+        }
 
         // Build video composition with custom compositor
         let videoComposition = AVMutableVideoComposition()
@@ -252,9 +324,11 @@ final class VideoComposer: ObservableObject {
             timeRange: timeRange,
             trackIDA: compTrackA.trackID,
             trackIDB: compTrackB.trackID,
-            rectA: frames.first,
-            rectB: frames.second,
-            outputSize: outputSize
+            rectA: rectA,
+            rectB: rectB,
+            outputSize: outputSize,
+            isPip: isPip,
+            pipShape: pipShape
         )
         videoComposition.instructions = [instruction]
 
@@ -324,6 +398,8 @@ final class VideoComposer: ObservableObject {
                 CGRect(x: 0, y: 0, width: outputSize.width, height: firstHeight),
                 CGRect(x: 0, y: secondY, width: outputSize.width, height: secondHeight)
             )
+        case .pip:
+            return (CGRect(origin: .zero, size: outputSize), .zero)
         }
     }
 }

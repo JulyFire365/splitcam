@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 分屏预览容器 — 显示两个画面 + 可拖拽分割线
+/// 分屏预览容器 — 显示两个画面 + 可拖拽分割线 / 画中画
 struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
     @ObservedObject var layout: SplitLayoutEngine
     @Binding var isDraggingBinding: Bool
@@ -8,6 +8,8 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
     let secondContent: () -> SecondContent
 
     @State private var isDragging = false
+    @State private var pipDragStartOffset: CGSize = .zero
+    @State private var pipScaleStart: CGFloat = 0.3
 
     init(layout: SplitLayoutEngine,
          isDraggingBinding: Binding<Bool> = .constant(false),
@@ -21,44 +23,139 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
 
     var body: some View {
         GeometryReader { geo in
-            let frames = layout.frames(in: geo.size)
-
-            ZStack {
-                // 第一个画面
-                firstContent()
-                    .frame(width: frames.first.width, height: frames.first.height)
-                    .position(
-                        x: frames.first.midX,
-                        y: frames.first.midY
-                    )
-                    .clipped()
-
-                // 第二个画面
-                secondContent()
-                    .frame(width: frames.second.width, height: frames.second.height)
-                    .position(
-                        x: frames.second.midX,
-                        y: frames.second.midY
-                    )
-                    .clipped()
-
-                // 分割线 + 可拖拽区域
-                dividerOverlay(in: geo.size)
+            if layout.splitMode == .pip {
+                pipLayout(in: geo.size)
+            } else {
+                splitLayout(in: geo.size)
             }
         }
     }
 
-    // MARK: - Divider
+    // MARK: - Split Layout (左右/上下)
+
+    private func splitLayout(in containerSize: CGSize) -> some View {
+        let frames = layout.frames(in: containerSize)
+
+        return ZStack {
+            // 第一个画面
+            firstContent()
+                .frame(width: frames.first.width, height: frames.first.height)
+                .position(x: frames.first.midX, y: frames.first.midY)
+                .clipped()
+
+            // 第二个画面
+            secondContent()
+                .frame(width: frames.second.width, height: frames.second.height)
+                .position(x: frames.second.midX, y: frames.second.midY)
+                .clipped()
+
+            // 分割线 + 可拖拽区域
+            dividerOverlay(in: containerSize)
+        }
+    }
+
+    // MARK: - PiP Layout (画中画)
+
+    private func pipLayout(in containerSize: CGSize) -> some View {
+        let pipFrame = layout.pipRect(in: containerSize)
+
+        return ZStack {
+            // 全屏背景画面
+            firstContent()
+                .frame(width: containerSize.width, height: containerSize.height)
+                .clipped()
+
+            // 画中画小窗口
+            pipWindow(in: containerSize, pipFrame: pipFrame)
+        }
+    }
+
+    private func pipWindow(in containerSize: CGSize, pipFrame: CGRect) -> some View {
+        let isCircle = layout.pipShape == .circle
+        let size = isCircle ? min(pipFrame.width, pipFrame.height) : 0
+
+        return secondContent()
+            .frame(width: isCircle ? size : pipFrame.width,
+                   height: isCircle ? size : pipFrame.height)
+            .clipShape(pipClipShapeValue)
+            .overlay(pipBorderOverlayView)
+            .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
+            .position(x: pipFrame.midX, y: pipFrame.midY)
+            // 拖拽移动
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        if !isDragging {
+                            isDragging = true
+                            isDraggingBinding = true
+                            pipDragStartOffset = layout.pipOffset
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }
+                        layout.pipOffset = CGSize(
+                            width: pipDragStartOffset.width + value.translation.width,
+                            height: pipDragStartOffset.height + value.translation.height
+                        )
+                    }
+                    .onEnded { _ in
+                        isDragging = false
+                        isDraggingBinding = false
+                    }
+            )
+            // 双指缩放
+            .simultaneousGesture(
+                MagnificationGesture()
+                    .onChanged { scale in
+                        if pipScaleStart == 0 {
+                            pipScaleStart = layout.pipScale
+                        }
+                        let newScale = pipScaleStart * scale
+                        layout.pipScale = min(SplitLayoutEngine.pipMaxScale,
+                                              max(SplitLayoutEngine.pipMinScale, newScale))
+                    }
+                    .onEnded { _ in
+                        pipScaleStart = 0
+                    }
+            )
+            // 点击交换主画面和小窗口
+            .onTapGesture {
+                // 通过 isDraggingBinding 传递 swap 信号不合适，
+                // 这里通过 NotificationCenter 通知 ViewModel
+                NotificationCenter.default.post(name: .splitCamSwapPanels, object: nil)
+            }
+            // 长按切换形状
+            .onLongPressGesture {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    layout.pipShape = layout.pipShape == .roundedRect ? .circle : .roundedRect
+                }
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
+    }
+
+    private var pipClipShapeValue: AnyShape {
+        if layout.pipShape == .circle {
+            return AnyShape(Circle())
+        } else {
+            return AnyShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private var pipBorderOverlayView: some View {
+        if layout.pipShape == .circle {
+            Circle()
+                .stroke(.white.opacity(0.6), lineWidth: 1.5)
+        } else {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(.white.opacity(0.6), lineWidth: 1.5)
+        }
+    }
+
+    // MARK: - Divider (分屏模式)
 
     @ViewBuilder
     private func dividerOverlay(in containerSize: CGSize) -> some View {
-        // 可见的分割线
         dividerLine(in: containerSize)
-
-        // 透明的拖拽热区 (宽度 44pt，方便手指触摸)
         dragHitArea(in: containerSize)
-
-        // 拖拽把手指示器（始终显示）
         dragHandle(in: containerSize)
     }
 
@@ -104,9 +201,7 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                         if !isDragging {
                             isDragging = true
                             isDraggingBinding = true
-                            // 触觉反馈
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         }
 
                         switch layout.splitMode {
@@ -118,14 +213,14 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                             let newRatio = value.location.y / containerSize.height
                             layout.splitRatio = min(SplitLayoutEngine.maxRatio,
                                                      max(SplitLayoutEngine.minRatio, newRatio))
+                        case .pip:
+                            break
                         }
                     }
                     .onEnded { _ in
                         isDragging = false
                         isDraggingBinding = false
-                        // 结束触觉反馈
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
             )
     }
