@@ -131,7 +131,7 @@ final class VideoComposer: ObservableObject {
         instruction.timeRange = timeRange
         instruction.backgroundColor = UIColor(borderStyle.color).cgColor
 
-        // Layer instruction A
+        // Layer instruction A — clip to target rect so it doesn't overflow
         let layerInstructionA = AVMutableVideoCompositionLayerInstruction(assetTrack: compTrackA)
         let transformA = try await makeTransform(
             for: videoTrackA,
@@ -139,8 +139,9 @@ final class VideoComposer: ObservableObject {
             outputSize: outputSize
         )
         layerInstructionA.setTransform(transformA, at: .zero)
+        layerInstructionA.setCropRectangle(frames.first, at: .zero)
 
-        // Layer instruction B
+        // Layer instruction B — clip to target rect so it doesn't overflow
         let layerInstructionB = AVMutableVideoCompositionLayerInstruction(assetTrack: compTrackB)
         let transformB = try await makeTransform(
             for: videoTrackB,
@@ -148,6 +149,7 @@ final class VideoComposer: ObservableObject {
             outputSize: outputSize
         )
         layerInstructionB.setTransform(transformB, at: .zero)
+        layerInstructionB.setCropRectangle(frames.second, at: .zero)
 
         instruction.layerInstructions = [layerInstructionA, layerInstructionB]
         videoComposition.instructions = [instruction]
