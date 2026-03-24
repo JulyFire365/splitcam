@@ -7,7 +7,6 @@ struct CameraView: View {
 
     @EnvironmentObject var coordinator: AppCoordinator
     @StateObject private var viewModel = CameraViewModel()
-    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -45,15 +44,11 @@ struct CameraView: View {
         .onDisappear {
             viewModel.cleanup()
         }
-        .onChange(of: scenePhase) { newPhase in
-            switch newPhase {
-            case .active:
-                viewModel.resumeSession()
-            case .background, .inactive:
-                viewModel.pauseSession()
-            @unknown default:
-                break
-            }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            viewModel.resumeSession()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            viewModel.pauseSession()
         }
         .sheet(isPresented: $viewModel.showVideoPicker) {
             VideoPicker(isPresented: $viewModel.showVideoPicker) { result in

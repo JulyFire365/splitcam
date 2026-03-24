@@ -38,6 +38,12 @@ class SampleBufferDisplayUIView: UIView {
         let pts = CMSampleBufferGetPresentationTimeStamp(buffer)
         guard pts != lastTimestamp else { return }
         lastTimestamp = pts
+
+        // If the layer entered an error state (e.g. after app backgrounding), flush and reset
+        if displayLayer.status == .failed {
+            displayLayer.flush()
+        }
+
         displayLayer.enqueue(buffer)
     }
 

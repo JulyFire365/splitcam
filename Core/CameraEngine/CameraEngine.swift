@@ -172,19 +172,24 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             guard let self else { return }
             guard let device = self.backDeviceInput?.device else { return }
 
+            // If using ultra-wide camera: factor 1.0 = 0.5x, 2.0 = 1x, 6.0 = 3x
+            // If using wide-angle camera: factor 1.0 = 1x, 3.0 = 3x
+            let isUltraWide = device.deviceType == .builtInUltraWideCamera
             let factor: CGFloat
             switch level {
             case .ultraWide:
-                factor = device.minAvailableVideoZoomFactor
+                factor = isUltraWide ? 1.0 : device.minAvailableVideoZoomFactor
             case .wide:
-                factor = max(1.0, device.minAvailableVideoZoomFactor)
+                factor = isUltraWide ? 2.0 : 1.0
             case .telephoto:
-                factor = min(3.0, device.maxAvailableVideoZoomFactor)
+                factor = isUltraWide ? 6.0 : 3.0
             }
 
+            let clamped = min(max(factor, device.minAvailableVideoZoomFactor),
+                              device.maxAvailableVideoZoomFactor)
             do {
                 try device.lockForConfiguration()
-                device.videoZoomFactor = factor
+                device.videoZoomFactor = clamped
                 device.unlockForConfiguration()
             } catch {
                 // Ignore zoom errors silently
@@ -234,8 +239,11 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             multiCamSession.removeOutput(output)
         }
 
-        // Setup back camera
-        if let backCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+        // Setup back camera — prefer ultra-wide for 0.5x/1x/3x zoom support
+        let backCamera: AVCaptureDevice? =
+            AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+        if let backCamera {
             do {
                 let input = try AVCaptureDeviceInput(device: backCamera)
                 if multiCamSession.canAddInput(input) {
@@ -263,6 +271,14 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                 }
 
                 configureDevice(backCamera, resolution: resolution)
+
+                // Default to 1x (wide) zoom — on ultra-wide this is factor 2.0
+                if backCamera.deviceType == .builtInUltraWideCamera {
+                    try? backCamera.lockForConfiguration()
+                    let wide = min(2.0, backCamera.maxAvailableVideoZoomFactor)
+                    backCamera.videoZoomFactor = wide
+                    backCamera.unlockForConfiguration()
+                }
             } catch {
                 DispatchQueue.main.async { self.error = .configurationFailed(error.localizedDescription) }
             }
