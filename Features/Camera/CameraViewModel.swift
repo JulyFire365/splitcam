@@ -320,7 +320,7 @@ final class CameraViewModel: ObservableObject {
                 splitMode: splitMode,
                 splitRatio: layoutEngine.splitRatio,
                 borderStyle: layoutEngine.borderStyle,
-                resolution: .hd1080p
+                outputSize: aspectRatio.exportSize
             ) { [weak self] result in
                 guard let self else { return }
                 switch result {

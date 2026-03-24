@@ -58,7 +58,7 @@ final class EditorViewModel: ObservableObject {
 
     /// 合成并导出视频
     func composeAndExport(
-        resolution: ExportResolution = .hd1080p,
+        outputSize: CGSize = CGSize(width: 1080, height: 1920),
         completion: @escaping (Result<URL, ComposerError>) -> Void
     ) {
         guard let videoA = videoAURL, let videoB = videoBURL else {
@@ -72,7 +72,7 @@ final class EditorViewModel: ObservableObject {
             splitMode: layoutEngine.splitMode,
             splitRatio: layoutEngine.splitRatio,
             borderStyle: layoutEngine.borderStyle,
-            resolution: resolution,
+            outputSize: outputSize,
             completion: completion
         )
     }

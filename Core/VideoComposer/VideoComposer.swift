@@ -20,7 +20,7 @@ final class VideoComposer: ObservableObject {
         splitMode: SplitMode,
         splitRatio: CGFloat,
         borderStyle: BorderStyleConfig,
-        resolution: ExportResolution,
+        outputSize: CGSize,
         completion: @escaping (Result<URL, ComposerError>) -> Void
     ) {
         Task {
@@ -36,7 +36,7 @@ final class VideoComposer: ObservableObject {
                     splitMode: splitMode,
                     splitRatio: splitRatio,
                     borderStyle: borderStyle,
-                    resolution: resolution
+                    outputSize: outputSize
                 )
                 await MainActor.run {
                     self.isExporting = false
@@ -73,7 +73,7 @@ final class VideoComposer: ObservableObject {
         splitMode: SplitMode,
         splitRatio: CGFloat,
         borderStyle: BorderStyleConfig,
-        resolution: ExportResolution
+        outputSize: CGSize
     ) async throws -> URL {
         let assetA = AVURLAsset(url: videoA)
         let assetB = AVURLAsset(url: videoB)
@@ -89,8 +89,6 @@ final class VideoComposer: ObservableObject {
         let durationA = try await assetA.load(.duration)
         let durationB = try await assetB.load(.duration)
         let duration = min(durationA, durationB)
-
-        let outputSize = resolution.size
 
         // Create composition
         let composition = AVMutableComposition()
@@ -173,7 +171,7 @@ final class VideoComposer: ObservableObject {
 
         guard let session = AVAssetExportSession(
             asset: composition,
-            presetName: resolution.exportPreset
+            presetName: AVAssetExportPresetHighestQuality
         ) else {
             throw ComposerError.exportFailed("无法创建导出会话")
         }

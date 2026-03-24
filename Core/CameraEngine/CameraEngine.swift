@@ -162,7 +162,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         let context = CIContext()
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
-        return UIImage(cgImage: cgImage, scale: 1.0, orientation: .right)
+        return UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
     }
 
     // MARK: - Zoom
