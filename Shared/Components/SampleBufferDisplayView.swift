@@ -44,6 +44,14 @@ class SampleBufferDisplayUIView: UIView {
             displayLayer.flush()
         }
 
+        // 确保 layer frame 已设置，避免首帧在零尺寸下被丢弃
+        if displayLayer.frame.isEmpty && !bounds.isEmpty {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            displayLayer.frame = bounds
+            CATransaction.commit()
+        }
+
         displayLayer.enqueue(buffer)
     }
 

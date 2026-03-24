@@ -144,7 +144,11 @@ final class CameraViewModel: ObservableObject {
 
     private func checkCamerasReady() {
         if frontReady && backReady && !camerasReady {
-            camerasReady = true
+            // 等待 DisplayLayer 完成布局和首帧渲染（layout + enqueue + render pipeline）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard let self else { return }
+                self.camerasReady = true
+            }
         }
     }
 
