@@ -26,7 +26,6 @@ final class CameraViewModel: ObservableObject {
     @Published var panelsSwapped = false
     @Published var recordingDuration: TimeInterval = 0
     @Published var showFlashEffect = false
-    @Published var showSaveSuccess = false
     @Published var isFrontMirrored = true
     @Published var isProcessing = false
     @Published var isDraggingDivider = false
@@ -48,9 +47,6 @@ final class CameraViewModel: ObservableObject {
     private var recordedBackURL: URL?
 
     private var cancellables = Set<AnyCancellable>()
-
-    // Frame throttling - only update every N frames during drag
-    private var frameCounter: Int = 0
 
     // MARK: - Computed
 
@@ -83,14 +79,11 @@ final class CameraViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Frame callbacks with throttling during drag
+        // Frame callbacks - freeze frames during drag for smooth divider movement
         cameraEngine.onFrontFrame = { [weak self] buffer in
             DispatchQueue.main.async {
                 guard let self else { return }
-                if self.isDraggingDivider {
-                    self.frameCounter += 1
-                    if self.frameCounter % 5 != 0 { return } // Skip 4 out of 5 frames during drag
-                }
+                guard !self.isDraggingDivider else { return }
                 self.frontFrameBuffer = buffer
             }
         }
@@ -98,9 +91,7 @@ final class CameraViewModel: ObservableObject {
         cameraEngine.onBackFrame = { [weak self] buffer in
             DispatchQueue.main.async {
                 guard let self else { return }
-                if self.isDraggingDivider {
-                    if self.frameCounter % 5 != 0 { return }
-                }
+                guard !self.isDraggingDivider else { return }
                 self.backFrameBuffer = buffer
             }
         }
@@ -120,6 +111,16 @@ final class CameraViewModel: ObservableObject {
     func cleanup() {
         cameraEngine.stopSession()
         mediaImporter.stopPlayback()
+    }
+
+    func resumeSession() {
+        cameraEngine.startSession()
+    }
+
+    func openSystemPhotos() {
+        if let url = URL(string: "photos-redirect://") {
+            UIApplication.shared.open(url)
+        }
     }
 
     // MARK: - Shooting Mode
@@ -252,13 +253,7 @@ final class CameraViewModel: ObservableObject {
             guard status == .authorized else { return }
             PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAsset(from: image)
-            } completionHandler: { success, _ in
-                DispatchQueue.main.async {
-                    if success {
-                        self.showSaveSuccess = true
-                    }
-                }
-            }
+            } completionHandler: { _, _ in }
         }
     }
 
@@ -267,12 +262,9 @@ final class CameraViewModel: ObservableObject {
             guard status == .authorized else { return }
             PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
-            } completionHandler: { success, _ in
+            } completionHandler: { _, _ in
                 DispatchQueue.main.async {
                     self.isProcessing = false
-                    if success {
-                        self.showSaveSuccess = true
-                    }
                 }
             }
         }

@@ -7,6 +7,7 @@ struct CameraView: View {
 
     @EnvironmentObject var coordinator: AppCoordinator
     @StateObject private var viewModel = CameraViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -44,6 +45,11 @@ struct CameraView: View {
         .onDisappear {
             viewModel.cleanup()
         }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                viewModel.resumeSession()
+            }
+        }
         .sheet(isPresented: $viewModel.showVideoPicker) {
             VideoPicker(isPresented: $viewModel.showVideoPicker) { result in
                 viewModel.handlePickedVideo(result)
@@ -53,11 +59,6 @@ struct CameraView: View {
             Button("确定", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage)
-        }
-        .alert("已保存", isPresented: $viewModel.showSaveSuccess) {
-            Button("好的") {}
-        } message: {
-            Text("已保存到系统相册")
         }
     }
 
@@ -115,15 +116,8 @@ struct CameraView: View {
 
     private var topBar: some View {
         HStack(alignment: .top) {
-            // 左上角: 相册入口
-            Button(action: { coordinator.navigateToGallery() }) {
-                Image(systemName: "photo.on.rectangle")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(.black.opacity(0.35)))
-            }
-            .disabled(viewModel.isRecording)
+            // 左上角: 占位
+            Color.clear.frame(width: 40, height: 40)
 
             Spacer()
 
@@ -345,7 +339,7 @@ struct CameraView: View {
     private var lastMediaButton: some View {
         Group {
             if let lastThumbnail = viewModel.lastSavedThumbnail {
-                Button(action: { coordinator.navigateToGallery() }) {
+                Button(action: { viewModel.openSystemPhotos() }) {
                     Image(uiImage: lastThumbnail)
                         .resizable()
                         .aspectRatio(contentMode: .fill)

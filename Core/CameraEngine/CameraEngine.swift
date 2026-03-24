@@ -166,25 +166,35 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     func setZoom(_ level: ZoomLevel) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            // Apply zoom to back camera
-            if let device = self.backDeviceInput?.device {
-                self.applyZoom(to: device, factor: level.rawValue)
+            guard let device = self.backDeviceInput?.device else { return }
+
+            // Map ZoomLevel to actual device zoom factor
+            // On wide-angle camera, min is typically 1.0
+            // 0.5x = use minimum zoom (as close to wide as possible)
+            // 1.0x = standard
+            // 3.0x = telephoto
+            let factor: CGFloat
+            switch level {
+            case .ultraWide:
+                // Use the device's minimum available zoom (may support < 1.0 on some devices)
+                factor = device.minAvailableVideoZoomFactor
+            case .wide:
+                factor = 1.0
+            case .telephoto:
+                factor = min(3.0, device.maxAvailableVideoZoomFactor)
             }
+
+            do {
+                try device.lockForConfiguration()
+                device.ramp(toVideoZoomFactor: factor, withRate: 8.0)
+                device.unlockForConfiguration()
+            } catch {
+                // Ignore zoom errors silently
+            }
+
             DispatchQueue.main.async {
                 self.currentZoom = level
             }
-        }
-    }
-
-    private func applyZoom(to device: AVCaptureDevice, factor: CGFloat) {
-        do {
-            try device.lockForConfiguration()
-            let clampedFactor = max(device.minAvailableVideoZoomFactor,
-                                     min(factor, device.maxAvailableVideoZoomFactor))
-            device.videoZoomFactor = clampedFactor
-            device.unlockForConfiguration()
-        } catch {
-            // Ignore zoom errors silently
         }
     }
 
