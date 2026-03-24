@@ -138,37 +138,56 @@ class SplitScreenCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     }
 
     /// 为画中画小窗口应用圆角矩形或圆形遮罩
+    /// 使用 CGContext（线程安全）创建遮罩，白色区域显示 PiP 内容
     private func applyPipMask(_ image: CIImage, rect: CGRect, shape: PipShape, outputHeight: CGFloat) -> CIImage {
         let ciY = outputHeight - rect.origin.y - rect.height
         let ciRect = CGRect(x: rect.origin.x, y: ciY, width: rect.width, height: rect.height)
 
-        // 创建遮罩图像
-        let maskSize = CGSize(width: rect.width, height: rect.height)
-        let renderer = UIGraphicsImageRenderer(size: maskSize)
-        let maskUIImage = renderer.image { ctx in
-            ctx.cgContext.setFillColor(UIColor.black.cgColor)
-            if shape == .circle {
-                let size = min(maskSize.width, maskSize.height)
-                let circleRect = CGRect(
-                    x: (maskSize.width - size) / 2,
-                    y: (maskSize.height - size) / 2,
-                    width: size,
-                    height: size
-                )
-                ctx.cgContext.fillEllipse(in: circleRect)
-            } else {
-                let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: maskSize), cornerRadius: 12)
-                ctx.cgContext.addPath(path.cgPath)
-                ctx.cgContext.fillPath()
-            }
+        let maskWidth = Int(rect.width)
+        let maskHeight = Int(rect.height)
+        guard maskWidth > 0, maskHeight > 0 else { return image }
+
+        // 用 CGContext 创建遮罩（线程安全，不依赖 UIGraphicsImageRenderer）
+        guard let context = CGContext(
+            data: nil,
+            width: maskWidth,
+            height: maskHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: maskWidth * 4,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else { return image }
+
+        // 背景黑色（透明区域）
+        context.setFillColor(gray: 0, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: maskWidth, height: maskHeight))
+
+        // 白色填充形状区域（CIBlendWithMask 中白色 = 显示前景）
+        context.setFillColor(gray: 1, alpha: 1)
+        if shape == .circle {
+            let size = min(CGFloat(maskWidth), CGFloat(maskHeight))
+            let circleRect = CGRect(
+                x: (CGFloat(maskWidth) - size) / 2,
+                y: (CGFloat(maskHeight) - size) / 2,
+                width: size,
+                height: size
+            )
+            context.fillEllipse(in: circleRect)
+        } else {
+            let cornerRadius: CGFloat = 12
+            let maskRect = CGRect(x: 0, y: 0, width: maskWidth, height: maskHeight)
+            let path = CGPath(roundedRect: maskRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+            context.addPath(path)
+            context.fillPath()
         }
 
-        guard let maskCGImage = maskUIImage.cgImage else { return image }
-        let maskCI = CIImage(cgImage: maskCGImage)
-            .transformed(by: CGAffineTransform(scaleX: 1, y: -1))
-            .transformed(by: CGAffineTransform(translationX: ciRect.origin.x, y: ciRect.origin.y + ciRect.height))
+        guard let maskCGImage = context.makeImage() else { return image }
 
-        // 使用 CIBlendWithMask 将遮罩应用到图像
+        // CIImage 坐标系：原点左下角，CGContext 生成的图像原点也是左下角，无需翻转
+        let maskCI = CIImage(cgImage: maskCGImage)
+            .transformed(by: CGAffineTransform(translationX: ciRect.origin.x, y: ciRect.origin.y))
+
+        // CIBlendWithMask: 白色=前景(PiP), 黑色=背景(透明)
         guard let blendFilter = CIFilter(name: "CIBlendWithMask") else { return image }
         let transparent = CIImage(color: .clear).cropped(to: image.extent)
         blendFilter.setValue(image, forKey: kCIInputImageKey)
