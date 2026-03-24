@@ -12,9 +12,13 @@ struct CameraView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // 全屏分屏预览（圆角），等待两个摄像头都出帧后显示
-            if viewModel.camerasReady {
-                splitPreview
+            // 全屏分屏预览（圆角）
+            splitPreview
+                .ignoresSafeArea()
+
+            // 摄像头未就绪时的黑色蒙版，就绪后平滑淡出
+            if !viewModel.camerasReady {
+                Color.black
                     .ignoresSafeArea()
                     .transition(.opacity)
             }
@@ -39,6 +43,7 @@ struct CameraView: View {
                 bottomControls
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.camerasReady)
         .navigationBarHidden(true)
         .statusBarHidden(true)
         .onAppear {
