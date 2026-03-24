@@ -2,6 +2,130 @@ import AVFoundation
 import CoreImage
 import UIKit
 
+// MARK: - Custom Video Compositing
+
+/// 自定义合成指令 — 存储分屏目标区域和轨道 ID
+class SplitScreenInstruction: NSObject, AVVideoCompositionInstructionProtocol {
+    let timeRange: CMTimeRange
+    let enablePostProcessing = false
+    let containsTweening = false
+    let requiredSourceTrackIDs: [NSValue]
+    let passthroughTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
+
+    let trackIDA: CMPersistentTrackID
+    let trackIDB: CMPersistentTrackID
+    let rectA: CGRect
+    let rectB: CGRect
+    let outputSize: CGSize
+
+    init(timeRange: CMTimeRange,
+         trackIDA: CMPersistentTrackID,
+         trackIDB: CMPersistentTrackID,
+         rectA: CGRect,
+         rectB: CGRect,
+         outputSize: CGSize) {
+        self.timeRange = timeRange
+        self.trackIDA = trackIDA
+        self.trackIDB = trackIDB
+        self.rectA = rectA
+        self.rectB = rectB
+        self.outputSize = outputSize
+        self.requiredSourceTrackIDs = [
+            NSNumber(value: trackIDA),
+            NSNumber(value: trackIDB)
+        ]
+        super.init()
+    }
+}
+
+/// 自定义视频合成器 — 使用 CIImage 逐帧渲染分屏画面（含裁切）
+class SplitScreenCompositor: NSObject, AVVideoCompositing {
+    var sourcePixelBufferAttributes: [String: Any]? = [
+        kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+    ]
+
+    var requiredPixelBufferAttributesForRenderContext: [String: Any] = [
+        kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+    ]
+
+    private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+
+    func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {}
+
+    func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
+        guard let instruction = request.videoCompositionInstruction as? SplitScreenInstruction else {
+            request.finish(with: NSError(domain: "SplitScreen", code: -1))
+            return
+        }
+
+        guard let outputBuffer = request.renderContext.newPixelBuffer() else {
+            request.finish(with: NSError(domain: "SplitScreen", code: -2))
+            return
+        }
+
+        let outputSize = instruction.outputSize
+
+        // Start with black background
+        var composite = CIImage(color: .black)
+            .cropped(to: CGRect(origin: .zero, size: outputSize))
+
+        // Render video A into its target rect
+        if let bufferA = request.sourceFrame(byTrackID: instruction.trackIDA) {
+            let imageA = CIImage(cvPixelBuffer: bufferA)
+            let fittedA = fitAndClip(imageA, into: instruction.rectA, outputHeight: outputSize.height)
+            composite = fittedA.composited(over: composite)
+        }
+
+        // Render video B into its target rect
+        if let bufferB = request.sourceFrame(byTrackID: instruction.trackIDB) {
+            let imageB = CIImage(cvPixelBuffer: bufferB)
+            let fittedB = fitAndClip(imageB, into: instruction.rectB, outputHeight: outputSize.height)
+            composite = fittedB.composited(over: composite)
+        }
+
+        ciContext.render(composite, to: outputBuffer)
+        request.finish(withComposedVideoFrame: outputBuffer)
+    }
+
+    func cancelAllPendingVideoCompositionRequests() {}
+
+    /// 将图像缩放填充目标区域并裁切（aspect fill + clip）
+    /// targetRect 使用 UIKit 坐标系（左上角原点），内部转换为 CIImage 坐标系（左下角原点）
+    private func fitAndClip(_ image: CIImage, into targetRect: CGRect, outputHeight: CGFloat) -> CIImage {
+        let imageSize = image.extent.size
+
+        // Aspect fill
+        let scaleX = targetRect.width / imageSize.width
+        let scaleY = targetRect.height / imageSize.height
+        let scale = max(scaleX, scaleY)
+
+        let scaledWidth = imageSize.width * scale
+        let scaledHeight = imageSize.height * scale
+
+        // Convert from UIKit coords (top-left origin) to CIImage coords (bottom-left origin)
+        let ciTargetY = outputHeight - targetRect.origin.y - targetRect.height
+        let ciTargetRect = CGRect(
+            x: targetRect.origin.x,
+            y: ciTargetY,
+            width: targetRect.width,
+            height: targetRect.height
+        )
+
+        // Center the scaled image within the CI target rect
+        let offsetX = ciTargetRect.origin.x + (ciTargetRect.width - scaledWidth) / 2
+        let offsetY = ciTargetRect.origin.y + (ciTargetRect.height - scaledHeight) / 2
+
+        let result = image
+            .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            .transformed(by: CGAffineTransform(translationX: offsetX, y: offsetY))
+            .cropped(to: ciTargetRect)
+
+        return result
+    }
+}
+
+// MARK: - Video Composer
+
 /// 视频合成引擎 — 将两路视频合成为分屏视频并导出
 @MainActor
 final class VideoComposer: ObservableObject {
@@ -13,7 +137,6 @@ final class VideoComposer: ObservableObject {
 
     // MARK: - Public API
 
-    /// 合成两个视频为分屏视频
     func compose(
         videoA: URL,
         videoB: URL,
@@ -78,7 +201,6 @@ final class VideoComposer: ObservableObject {
         let assetA = AVURLAsset(url: videoA)
         let assetB = AVURLAsset(url: videoB)
 
-        // Load tracks
         let tracksA = try await assetA.loadTracks(withMediaType: .video)
         let tracksB = try await assetB.loadTracks(withMediaType: .video)
 
@@ -105,7 +227,7 @@ final class VideoComposer: ObservableObject {
         try compTrackA.insertTimeRange(timeRange, of: videoTrackA, at: .zero)
         try compTrackB.insertTimeRange(timeRange, of: videoTrackB, at: .zero)
 
-        // Add audio from first video
+        // Add audio
         let audioTracksA = try await assetA.loadTracks(withMediaType: .audio)
         if let audioTrackA = audioTracksA.first,
            let compAudioTrack = composition.addMutableTrack(
@@ -114,58 +236,29 @@ final class VideoComposer: ObservableObject {
             try compAudioTrack.insertTimeRange(timeRange, of: audioTrackA, at: .zero)
         }
 
-        // Calculate frames for each video
+        // Calculate target rects
         let frames = calculateFrames(
             splitMode: splitMode,
             splitRatio: splitRatio,
             outputSize: outputSize,
-            borderWidth: borderStyle.width
+            borderWidth: borderStyle.style != .none ? borderStyle.width : 0
         )
 
-        // Build video composition
+        // Build video composition with custom compositor
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = outputSize
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.customVideoCompositorClass = SplitScreenCompositor.self
 
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = timeRange
-        instruction.backgroundColor = UIColor(borderStyle.color).cgColor
-
-        // Layer instruction A — clip to target rect so it doesn't overflow
-        let layerInstructionA = AVMutableVideoCompositionLayerInstruction(assetTrack: compTrackA)
-        let transformA = try await makeTransform(
-            for: videoTrackA,
-            targetRect: frames.first,
+        let instruction = SplitScreenInstruction(
+            timeRange: timeRange,
+            trackIDA: compTrackA.trackID,
+            trackIDB: compTrackB.trackID,
+            rectA: frames.first,
+            rectB: frames.second,
             outputSize: outputSize
         )
-        layerInstructionA.setTransform(transformA, at: .zero)
-        layerInstructionA.setCropRectangle(frames.first, at: .zero)
-
-        // Layer instruction B — clip to target rect so it doesn't overflow
-        let layerInstructionB = AVMutableVideoCompositionLayerInstruction(assetTrack: compTrackB)
-        let transformB = try await makeTransform(
-            for: videoTrackB,
-            targetRect: frames.second,
-            outputSize: outputSize
-        )
-        layerInstructionB.setTransform(transformB, at: .zero)
-        layerInstructionB.setCropRectangle(frames.second, at: .zero)
-
-        instruction.layerInstructions = [layerInstructionA, layerInstructionB]
         videoComposition.instructions = [instruction]
-
-        // Add border overlay layer if needed
-        if borderStyle.style != .none {
-            addBorderOverlay(
-                to: videoComposition,
-                splitMode: splitMode,
-                splitRatio: splitRatio,
-                borderStyle: borderStyle,
-                outputSize: outputSize,
-                duration: duration,
-                composition: composition
-            )
-        }
 
         // Export
         let outputURL = FileManager.default.temporaryDirectory
@@ -185,7 +278,6 @@ final class VideoComposer: ObservableObject {
 
         self.exportSession = session
 
-        // Monitor progress in a separate task
         let progressTask = Task {
             while !Task.isCancelled {
                 let currentProgress = session.progress
@@ -235,90 +327,6 @@ final class VideoComposer: ObservableObject {
                 CGRect(x: 0, y: secondY, width: outputSize.width, height: secondHeight)
             )
         }
-    }
-
-    // MARK: - Transform
-
-    private func makeTransform(
-        for track: AVAssetTrack,
-        targetRect: CGRect,
-        outputSize: CGSize
-    ) async throws -> CGAffineTransform {
-        let naturalSize = try await track.load(.naturalSize)
-        let preferredTransform = try await track.load(.preferredTransform)
-
-        // Apply the track's preferred transform to get actual dimensions
-        let transformedSize = naturalSize.applying(preferredTransform)
-        let actualWidth = abs(transformedSize.width)
-        let actualHeight = abs(transformedSize.height)
-
-        // Scale to fill the target rect (aspect fill)
-        let scaleX = targetRect.width / actualWidth
-        let scaleY = targetRect.height / actualHeight
-        let scale = max(scaleX, scaleY)
-
-        // Center in target rect
-        let scaledWidth = actualWidth * scale
-        let scaledHeight = actualHeight * scale
-        let offsetX = targetRect.origin.x + (targetRect.width - scaledWidth) / 2
-        let offsetY = targetRect.origin.y + (targetRect.height - scaledHeight) / 2
-
-        let transform = preferredTransform
-            .concatenating(CGAffineTransform(scaleX: scale, y: scale))
-            .concatenating(CGAffineTransform(translationX: offsetX, y: offsetY))
-
-        return transform
-    }
-
-    // MARK: - Border Overlay
-
-    private func addBorderOverlay(
-        to videoComposition: AVMutableVideoComposition,
-        splitMode: SplitMode,
-        splitRatio: CGFloat,
-        borderStyle: BorderStyleConfig,
-        outputSize: CGSize,
-        duration: CMTime,
-        composition: AVMutableComposition
-    ) {
-        let overlayLayer = CALayer()
-        overlayLayer.frame = CGRect(origin: .zero, size: outputSize)
-
-        let borderLayer = CAShapeLayer()
-        borderLayer.frame = overlayLayer.bounds
-
-        let path = UIBezierPath()
-        let borderColor = UIColor(borderStyle.color)
-
-        switch splitMode {
-        case .leftRight:
-            let x = outputSize.width * splitRatio
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: outputSize.height))
-        case .topBottom:
-            let y = outputSize.height * splitRatio
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: outputSize.width, y: y))
-        }
-
-        borderLayer.path = path.cgPath
-        borderLayer.strokeColor = borderColor.cgColor
-        borderLayer.lineWidth = borderStyle.width
-        borderLayer.fillColor = nil
-        overlayLayer.addSublayer(borderLayer)
-
-        let parentLayer = CALayer()
-        parentLayer.frame = CGRect(origin: .zero, size: outputSize)
-        let videoLayer = CALayer()
-        videoLayer.frame = CGRect(origin: .zero, size: outputSize)
-
-        parentLayer.addSublayer(videoLayer)
-        parentLayer.addSublayer(overlayLayer)
-
-        videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
-            postProcessingAsVideoLayer: videoLayer,
-            in: parentLayer
-        )
     }
 }
 
