@@ -48,6 +48,8 @@ final class CameraViewModel: ObservableObject {
     private var recordedBackURL: URL?
     private var frontReady = false
     private var backReady = false
+    private var frontFrameCount = 0
+    private var backFrameCount = 0
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -82,14 +84,19 @@ final class CameraViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Frame callbacks - always deliver frames for real-time preview
+        // Frame callbacks - skip first few frames (sensor may output black during init)
+        let readyThreshold = 5 // 跳过前 5 帧，约 167ms@30fps，等传感器稳定
+
         cameraEngine.onFrontFrame = { [weak self] buffer in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.frontFrameBuffer = buffer
                 if !self.frontReady {
-                    self.frontReady = true
-                    self.checkCamerasReady()
+                    self.frontFrameCount += 1
+                    if self.frontFrameCount >= readyThreshold {
+                        self.frontReady = true
+                        self.checkCamerasReady()
+                    }
                 }
             }
         }
@@ -99,8 +106,11 @@ final class CameraViewModel: ObservableObject {
                 guard let self else { return }
                 self.backFrameBuffer = buffer
                 if !self.backReady {
-                    self.backReady = true
-                    self.checkCamerasReady()
+                    self.backFrameCount += 1
+                    if self.backFrameCount >= readyThreshold {
+                        self.backReady = true
+                        self.checkCamerasReady()
+                    }
                 }
             }
         }
@@ -135,9 +145,11 @@ final class CameraViewModel: ObservableObject {
     }
 
     func resumeSession() {
-        // 重新等待两个摄像头都出帧
+        // 重新等待两个摄像头都出稳定帧
         frontReady = false
         backReady = false
+        frontFrameCount = 0
+        backFrameCount = 0
         camerasReady = false
         cameraEngine.startSession()
     }

@@ -16,12 +16,14 @@ struct CameraView: View {
             splitPreview
                 .ignoresSafeArea()
 
-            // 摄像头未就绪时的黑色蒙版，就绪后平滑淡出
-            if !viewModel.camerasReady {
-                Color.black
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-            }
+            // 摄像头未就绪时的黑色蒙版
+            // opacity 实现：未就绪时立刻全黑，就绪后平滑淡出
+            Color.black
+                .ignoresSafeArea()
+                .opacity(viewModel.camerasReady ? 0 : 1)
+                .animation(viewModel.camerasReady ? .easeOut(duration: 0.3) : nil,
+                           value: viewModel.camerasReady)
+                .allowsHitTesting(false)
 
             // 闪光效果 (拍照)
             if viewModel.showFlashEffect {
@@ -43,7 +45,6 @@ struct CameraView: View {
                 bottomControls
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.camerasReady)
         .navigationBarHidden(true)
         .statusBarHidden(true)
         .onAppear {
