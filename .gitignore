@@ -1,0 +1,29 @@
+# Xcode
+.DS_Store
+build/
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+*.xcworkspace
+!default.xcworkspace
+
+# Swift Package Manager
+.swiftpm/
+Packages/
+Package.resolved
+
+# CocoaPods
+Pods/
+*.xcworkspace
+
+# Carthage
+Carthage/Build/
+Carthage/Checkouts/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+*.swp
+*~
