@@ -418,20 +418,19 @@ struct CameraPreviewPanel: View {
             if let importedVideoBuffer {
                 // 录制中：显示实时视频帧
                 SampleBufferDisplayView(sampleBuffer: importedVideoBuffer)
+                    .overlay(Text("REC").foregroundColor(.red).font(.caption).padding(4), alignment: .topLeading)
             } else if let importedImage {
                 // 合拍预览：纯 SwiftUI 显示缩略图
                 Image(uiImage: importedImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .overlay(Text("IMG").foregroundColor(.green).font(.caption).padding(4), alignment: .topLeading)
             } else if importedPlayer != nil {
-                // 缩略图未就绪时的兜底（不应该到这里）
                 Color.gray.opacity(0.3)
-                    .overlay(
-                        ProgressView()
-                            .tint(.white)
-                    )
+                    .overlay(Text("PLAYER").foregroundColor(.yellow).font(.caption).padding(4), alignment: .topLeading)
             } else if let buffer = sampleBuffer {
                 SampleBufferDisplayView(sampleBuffer: buffer)
+                    .overlay(Text("CAM").foregroundColor(.cyan).font(.caption).padding(4), alignment: .topLeading)
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "camera.fill")

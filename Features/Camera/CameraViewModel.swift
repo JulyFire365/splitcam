@@ -852,7 +852,7 @@ final class CameraViewModel: ObservableObject {
                     debugText = "③ 视频加载完成，生成缩略图..."
                     let player = mediaImporter.createPlayer(for: url)
                     let thumb = mediaImporter.thumbnailImage
-                    debugText = "④ thumb=\(thumb != nil) size=\(thumb?.size ?? .zero)"
+                    debugText = "④ thumb=\(thumb != nil) size=\(thumb?.size ?? .zero) swap=\(panelsSwapped)"
                     importedImage = thumb
                     importedPlayer = player
 
