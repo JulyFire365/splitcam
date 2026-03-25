@@ -30,6 +30,7 @@ final class CameraViewModel: ObservableObject {
     @Published var panelsSwapped = false
     @Published var recordingDuration: TimeInterval = 0
     @Published var showFlashEffect = false
+    @Published var freeRecordingLimitReached = false
     @Published var isFrontMirrored = true
     @Published var isProcessing = false
     @Published var isDraggingDivider = false
@@ -577,6 +578,14 @@ final class CameraViewModel: ObservableObject {
                     return
                 }
                 self.recordingDuration += 1
+
+                // 免费版录制时长限制
+                if !SubscriptionManager.shared.isPro &&
+                    self.recordingDuration >= SubscriptionManager.freeRecordingLimit {
+                    self.stopRecording()
+                    self.freeRecordingLimitReached = true
+                    timer.invalidate()
+                }
             }
         }
 

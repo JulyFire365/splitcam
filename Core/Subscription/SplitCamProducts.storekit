@@ -1,0 +1,121 @@
+{
+  "identifier" : "com.splitcam.products",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "68.0",
+      "familyShareable" : false,
+      "internalID" : "splitcam_lifetime",
+      "localizations" : [
+        {
+          "description" : "一次付费，永久使用全部 Pro 功能",
+          "displayName" : "SplitCam Pro 终身版",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "One-time purchase for all Pro features",
+          "displayName" : "SplitCam Pro Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.splitcam.pro.lifetime",
+      "referenceName" : "Pro Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "splitcam",
+    "_developerTeamID" : ""
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "splitcam_pro",
+      "localizations" : [
+        {
+          "description" : "解锁全部高级功能",
+          "displayName" : "SplitCam Pro",
+          "locale" : "zh_CN"
+        }
+      ],
+      "name" : "SplitCam Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "6.0",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "splitcam_monthly",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "每月自动续费，可随时取消",
+              "displayName" : "SplitCam Pro 月度会员",
+              "locale" : "zh_CN"
+            },
+            {
+              "description" : "Auto-renews monthly",
+              "displayName" : "SplitCam Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.splitcam.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "splitcam_pro",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "28.0",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "splitcam_yearly",
+          "introductoryOffer" : {
+            "internalID" : "yearly_trial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "每年自动续费，3天免费试用",
+              "displayName" : "SplitCam Pro 年度会员",
+              "locale" : "zh_CN"
+            },
+            {
+              "description" : "Auto-renews yearly, 3-day free trial",
+              "displayName" : "SplitCam Pro Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.splitcam.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Yearly",
+          "subscriptionGroupID" : "splitcam_pro",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

@@ -7,6 +7,9 @@ struct CameraView: View {
 
     @EnvironmentObject var coordinator: AppCoordinator
     @StateObject private var viewModel = CameraViewModel()
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
+    @State private var paywallTrigger: ProFeature?
 
     var body: some View {
         ZStack {
@@ -75,6 +78,16 @@ struct CameraView: View {
         } message: {
             Text(viewModel.errorMessage)
         }
+        .fullScreenCover(isPresented: $showPaywall) {
+            PaywallView(triggeredBy: paywallTrigger)
+        }
+        .onChange(of: viewModel.freeRecordingLimitReached) { reached in
+            if reached {
+                paywallTrigger = .unlimitedRecording
+                showPaywall = true
+                viewModel.freeRecordingLimitReached = false
+            }
+        }
     }
 
     // MARK: - Full Screen Preview
@@ -119,9 +132,11 @@ struct CameraView: View {
         VStack(spacing: 0) {
             // 渐变遮罩背景
             HStack(alignment: .center) {
-                // 左: 导入按钮
+                // 左: 导入按钮 (合拍 Pro)
                 toolButton(icon: "photo.badge.plus") {
-                    viewModel.showVideoPicker = true
+                    requirePro(.duetMode) {
+                        viewModel.showVideoPicker = true
+                    }
                 }
                 .opacity(viewModel.isRecording ? 0 : 1)
 
@@ -193,18 +208,32 @@ struct CameraView: View {
         HStack(spacing: 0) {
             ForEach(SplitMode.allCases) { splitMode in
                 Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        viewModel.splitMode = splitMode
+                    if splitMode == .pip && !subscriptionManager.isPro {
+                        requirePro(.pipMode) {}
+                    } else {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            viewModel.splitMode = splitMode
+                        }
                     }
                 } label: {
-                    Image(systemName: splitModeIcon(splitMode))
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(viewModel.splitMode == splitMode ? .white : .white.opacity(0.45))
-                        .frame(width: 44, height: 36)
-                        .background(
-                            Capsule()
-                                .fill(viewModel.splitMode == splitMode ? .white.opacity(0.25) : .clear)
-                        )
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: splitModeIcon(splitMode))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(viewModel.splitMode == splitMode ? .white : .white.opacity(0.45))
+                            .frame(width: 44, height: 36)
+                            .background(
+                                Capsule()
+                                    .fill(viewModel.splitMode == splitMode ? .white.opacity(0.25) : .clear)
+                            )
+
+                        // Pro 锁标
+                        if splitMode == .pip && !subscriptionManager.isPro {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 7))
+                                .foregroundColor(.orange)
+                                .offset(x: -2, y: 4)
+                        }
+                    }
                 }
             }
         }
@@ -218,8 +247,12 @@ struct CameraView: View {
         HStack(spacing: 8) {
             ForEach(AspectRatioMode.allCases) { ratio in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        viewModel.setAspectRatio(ratio)
+                    if ratio != .ratio9_16 && !subscriptionManager.isPro {
+                        requirePro(.allAspectRatios) {}
+                    } else {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            viewModel.setAspectRatio(ratio)
+                        }
                     }
                 } label: {
                     Text(ratio.rawValue)
@@ -245,8 +278,12 @@ struct CameraView: View {
         HStack(spacing: 2) {
             ForEach(ZoomLevel.allCases, id: \.rawValue) { level in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        viewModel.setZoom(level)
+                    if level == .telephoto && !subscriptionManager.isPro {
+                        requirePro(.telephotoZoom) {}
+                    } else {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            viewModel.setZoom(level)
+                        }
                     }
                 } label: {
                     Text(level.label)
@@ -449,6 +486,16 @@ struct CameraView: View {
     }
 
     // MARK: - Helpers
+
+    /// 检查 Pro 功能，未订阅则弹付费墙
+    private func requirePro(_ feature: ProFeature, action: @escaping () -> Void) {
+        if subscriptionManager.isPro {
+            action()
+        } else {
+            paywallTrigger = feature
+            showPaywall = true
+        }
+    }
 
     private func splitModeIcon(_ mode: SplitMode) -> String {
         switch mode {
