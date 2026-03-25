@@ -29,6 +29,8 @@
 		A10020 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10020 /* Assets.xcassets */; };
 		A10021 /* MediaStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022 /* MediaStore.swift */; };
 		A10022 /* GalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023 /* GalleryView.swift */; };
+		A10023 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10024 /* SubscriptionManager.swift */; };
+		A10024 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10025 /* PaywallView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +58,9 @@
 		B10021 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10022 /* MediaStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaStore.swift; sourceTree = "<group>"; };
 		B10023 /* GalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryView.swift; sourceTree = "<group>"; };
+		B10024 /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		B10025 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		B10026 /* SplitCamProducts.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = SplitCamProducts.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -153,6 +158,7 @@
 				D10011 /* VideoComposer */,
 				D10012 /* MediaImporter */,
 				D10019 /* MediaStore */,
+				D10021 /* Subscription */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -258,6 +264,16 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		D10021 /* Subscription */ = {
+			isa = PBXGroup;
+			children = (
+				B10024 /* SubscriptionManager.swift */,
+				B10025 /* PaywallView.swift */,
+				B10026 /* SplitCamProducts.storekit */,
+			);
+			path = Subscription;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -349,6 +365,8 @@
 				A10019 /* DeviceCapability.swift in Sources */,
 				A10021 /* MediaStore.swift in Sources */,
 				A10022 /* GalleryView.swift in Sources */,
+				A10023 /* SubscriptionManager.swift in Sources */,
+				A10024 /* PaywallView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
