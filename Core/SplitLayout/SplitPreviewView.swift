@@ -116,14 +116,8 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                         pipScaleStart = 0
                     }
             )
-            // 点击交换主画面和小窗口
+            // 点击切换小窗口形状（圆形/矩形）
             .onTapGesture {
-                // 通过 isDraggingBinding 传递 swap 信号不合适，
-                // 这里通过 NotificationCenter 通知 ViewModel
-                NotificationCenter.default.post(name: .splitCamSwapPanels, object: nil)
-            }
-            // 长按切换形状
-            .onLongPressGesture {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     layout.pipShape = layout.pipShape == .roundedRect ? .circle : .roundedRect
                 }
