@@ -54,7 +54,8 @@ final class CameraViewModel: ObservableObject {
     nonisolated(unsafe) private var importedVideoOutput: AVPlayerItemVideoOutput?
     nonisolated(unsafe) private var importedCIImage: CIImage?
     nonisolated(unsafe) private var recIsDuetMode: Bool = false
-    nonisolated(unsafe) private var latestImportedPixelBuffer: CVPixelBuffer?
+    nonisolated(unsafe) private var latestImportedCIImage: CIImage?
+    nonisolated(unsafe) private var importedVideoTransform: CGAffineTransform = .identity
 
     var isDuetMode: Bool {
         mediaImporter.isInDuetMode
@@ -130,7 +131,7 @@ final class CameraViewModel: ObservableObject {
                 self.frontFrameBuffer = buffer
                 if !self.frontReady {
                     self.frontFrameCount += 1
-                    if self.frontFrameCount >= 3 {
+                    if self.frontFrameCount >= 2 {
                         self.frontReady = true
                         self.checkCamerasReady()
                     }
@@ -144,7 +145,7 @@ final class CameraViewModel: ObservableObject {
                 self.backFrameBuffer = buffer
                 if !self.backReady {
                     self.backFrameCount += 1
-                    if self.backFrameCount >= 3 {
+                    if self.backFrameCount >= 2 {
                         self.backReady = true
                         self.checkCamerasReady()
                     }
@@ -166,11 +167,30 @@ final class CameraViewModel: ObservableObject {
             if self.recIsDuetMode, let vo = self.importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    self.latestImportedPixelBuffer = pb
-                    let pts = CMSampleBufferGetPresentationTimeStamp(buffer)
-                    if let sb = self.createSampleBufferFromPixelBuffer(pb, timestamp: pts) {
-                        DispatchQueue.main.async {
-                            self.importedVideoBuffer = sb
+                    // 应用视频方向变换
+                    var ci = CIImage(cvPixelBuffer: pb)
+                    let xform = self.importedVideoTransform
+                    if xform != .identity {
+                        ci = ci.transformed(by: xform)
+                        let ext = ci.extent
+                        if ext.origin.x != 0 || ext.origin.y != 0 {
+                            ci = ci.transformed(by: CGAffineTransform(
+                                translationX: -ext.origin.x, y: -ext.origin.y))
+                        }
+                    }
+                    self.latestImportedCIImage = ci
+
+                    // 渲染正确方向的预览帧
+                    let w = Int(ci.extent.width), h = Int(ci.extent.height)
+                    var previewPB: CVPixelBuffer?
+                    CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_32BGRA, nil, &previewPB)
+                    if let ppb = previewPB {
+                        self.recordingCIContext.render(ci, to: ppb)
+                        let pts = CMSampleBufferGetPresentationTimeStamp(buffer)
+                        if let sb = self.createSampleBufferFromPixelBuffer(ppb, timestamp: pts) {
+                            DispatchQueue.main.async {
+                                self.importedVideoBuffer = sb
+                            }
                         }
                     }
                 }
@@ -239,8 +259,7 @@ final class CameraViewModel: ObservableObject {
     private func checkCamerasReady() {
         if frontReady && backReady && !camerasReady {
             // 等待 DisplayLayer 完成布局和渲染管线
-            // 0.6s 确保：帧传递 + SwiftUI布局 + DisplayLayer enqueue + GPU渲染
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
                 guard let self else { return }
                 self.camerasReady = true
             }
@@ -332,7 +351,15 @@ final class CameraViewModel: ObservableObject {
             } else if let vo = importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    let ci = CIImage(cvPixelBuffer: pb)
+                    var ci = CIImage(cvPixelBuffer: pb)
+                    if importedVideoTransform != .identity {
+                        ci = ci.transformed(by: importedVideoTransform)
+                        let ext = ci.extent
+                        if ext.origin.x != 0 || ext.origin.y != 0 {
+                            ci = ci.transformed(by: CGAffineTransform(
+                                translationX: -ext.origin.x, y: -ext.origin.y))
+                        }
+                    }
                     let ctx = CIContext()
                     if let cg = ctx.createCGImage(ci, from: ci.extent) {
                         backImage = UIImage(cgImage: cg)
@@ -648,8 +675,8 @@ final class CameraViewModel: ObservableObject {
         let frontCI = CIImage(cvPixelBuffer: frontPB)
         let backCI: CIImage
         if recIsDuetMode {
-            if let pb = latestImportedPixelBuffer {
-                backCI = CIImage(cvPixelBuffer: pb)
+            if let ci = latestImportedCIImage {
+                backCI = ci
             } else if let img = importedCIImage {
                 backCI = img
             } else {
@@ -773,7 +800,7 @@ final class CameraViewModel: ObservableObject {
         guard isRecording else { return }
         isRecording = false
         importedVideoBuffer = nil
-        latestImportedPixelBuffer = nil
+        latestImportedCIImage = nil
 
         if isDuetMode {
             mediaImporter.pausePlayback()
@@ -830,13 +857,26 @@ final class CameraViewModel: ObservableObject {
                     importedPlayer = player
                     importedImage = mediaImporter.thumbnailImage
 
-                    // 设置视频输出用于录制时抓帧
-                    let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
-                        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+                    // 设置视频输出（强制 SDR 避免 HDR 户外视频过曝）
+                    let output = AVPlayerItemVideoOutput(outputSettings: [
+                        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                        AVVideoColorPropertiesKey: [
+                            AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                            AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                            AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+                        ]
                     ])
                     player.currentItem?.add(output)
                     importedVideoOutput = output
                     importedCIImage = nil
+
+                    // 加载视频方向变换
+                    let asset = AVURLAsset(url: url)
+                    if let track = try? await asset.loadTracks(withMediaType: .video).first {
+                        importedVideoTransform = (try? await track.load(.preferredTransform)) ?? .identity
+                    } else {
+                        importedVideoTransform = .identity
+                    }
 
                     // 视频播放结束自动停止录制
                     mediaImporter.onVideoDidEnd = { [weak self] in
@@ -867,7 +907,8 @@ final class CameraViewModel: ObservableObject {
         importedVideoBuffer = nil
         importedVideoOutput = nil
         importedCIImage = nil
-        latestImportedPixelBuffer = nil
+        latestImportedCIImage = nil
+        importedVideoTransform = .identity
         recIsDuetMode = false
         syncRecordingSnapshot()
     }
