@@ -55,7 +55,7 @@ final class CameraViewModel: ObservableObject {
     nonisolated(unsafe) private var importedCIImage: CIImage?
     nonisolated(unsafe) private var recIsDuetMode: Bool = false
     nonisolated(unsafe) private var latestImportedCIImage: CIImage?
-    nonisolated(unsafe) private var importedVideoTransform: CGAffineTransform = .identity
+    nonisolated(unsafe) private var importedVideoOrientation: CGImagePropertyOrientation = .up
 
     var isDuetMode: Bool {
         mediaImporter.isInDuetMode
@@ -131,7 +131,7 @@ final class CameraViewModel: ObservableObject {
                 self.frontFrameBuffer = buffer
                 if !self.frontReady {
                     self.frontFrameCount += 1
-                    if self.frontFrameCount >= 2 {
+                    if self.frontFrameCount >= 1 {
                         self.frontReady = true
                         self.checkCamerasReady()
                     }
@@ -145,7 +145,7 @@ final class CameraViewModel: ObservableObject {
                 self.backFrameBuffer = buffer
                 if !self.backReady {
                     self.backFrameCount += 1
-                    if self.backFrameCount >= 2 {
+                    if self.backFrameCount >= 1 {
                         self.backReady = true
                         self.checkCamerasReady()
                     }
@@ -167,16 +167,13 @@ final class CameraViewModel: ObservableObject {
             if self.recIsDuetMode, let vo = self.importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    // 应用视频方向变换
-                    var ci = CIImage(cvPixelBuffer: pb)
-                    let xform = self.importedVideoTransform
-                    if xform != .identity {
-                        ci = ci.transformed(by: xform)
-                        let ext = ci.extent
-                        if ext.origin.x != 0 || ext.origin.y != 0 {
-                            ci = ci.transformed(by: CGAffineTransform(
-                                translationX: -ext.origin.x, y: -ext.origin.y))
-                        }
+                    // 强制 sRGB 色彩空间（防止 HDR/HLG 过曝）+ 修正视频方向
+                    var ci = CIImage(cvPixelBuffer: pb, options: [
+                        .colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
+                    ])
+                    let orientation = self.importedVideoOrientation
+                    if orientation != .up {
+                        ci = ci.oriented(orientation)
                     }
                     self.latestImportedCIImage = ci
 
@@ -258,11 +255,7 @@ final class CameraViewModel: ObservableObject {
 
     private func checkCamerasReady() {
         if frontReady && backReady && !camerasReady {
-            // 等待 DisplayLayer 完成布局和渲染管线
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                guard let self else { return }
-                self.camerasReady = true
-            }
+            camerasReady = true
         }
     }
 
@@ -351,14 +344,11 @@ final class CameraViewModel: ObservableObject {
             } else if let vo = importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    var ci = CIImage(cvPixelBuffer: pb)
-                    if importedVideoTransform != .identity {
-                        ci = ci.transformed(by: importedVideoTransform)
-                        let ext = ci.extent
-                        if ext.origin.x != 0 || ext.origin.y != 0 {
-                            ci = ci.transformed(by: CGAffineTransform(
-                                translationX: -ext.origin.x, y: -ext.origin.y))
-                        }
+                    var ci = CIImage(cvPixelBuffer: pb, options: [
+                        .colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
+                    ])
+                    if importedVideoOrientation != .up {
+                        ci = ci.oriented(importedVideoOrientation)
                     }
                     let ctx = CIContext()
                     if let cg = ctx.createCGImage(ci, from: ci.extent) {
@@ -870,12 +860,13 @@ final class CameraViewModel: ObservableObject {
                     importedVideoOutput = output
                     importedCIImage = nil
 
-                    // 加载视频方向变换
+                    // 加载视频方向
                     let asset = AVURLAsset(url: url)
-                    if let track = try? await asset.loadTracks(withMediaType: .video).first {
-                        importedVideoTransform = (try? await track.load(.preferredTransform)) ?? .identity
+                    if let track = try? await asset.loadTracks(withMediaType: .video).first,
+                       let transform = try? await track.load(.preferredTransform) {
+                        importedVideoOrientation = Self.orientationFromTransform(transform)
                     } else {
-                        importedVideoTransform = .identity
+                        importedVideoOrientation = .up
                     }
 
                     // 视频播放结束自动停止录制
@@ -908,9 +899,24 @@ final class CameraViewModel: ObservableObject {
         importedVideoOutput = nil
         importedCIImage = nil
         latestImportedCIImage = nil
-        importedVideoTransform = .identity
+        importedVideoOrientation = .up
         recIsDuetMode = false
         syncRecordingSnapshot()
+    }
+}
+
+    // MARK: - Orientation Helper
+
+    /// 从 AVAssetTrack 的 preferredTransform 推导 CGImagePropertyOrientation
+    private static func orientationFromTransform(_ t: CGAffineTransform) -> CGImagePropertyOrientation {
+        if t.a == 0 && t.b == 1 && t.c == -1 && t.d == 0 {
+            return .right      // 90° CW（竖拍）
+        } else if t.a == 0 && t.b == -1 && t.c == 1 && t.d == 0 {
+            return .left       // 270° CW
+        } else if t.a == -1 && t.b == 0 && t.c == 0 && t.d == -1 {
+            return .down       // 180°
+        }
+        return .up             // 0°（横拍）
     }
 }
 
