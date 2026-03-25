@@ -4,6 +4,7 @@ import CoreMedia
 import PhotosUI
 import Photos
 import Combine
+import UniformTypeIdentifiers
 
 /// 拍摄页面 ViewModel
 @MainActor
@@ -45,6 +46,16 @@ final class CameraViewModel: ObservableObject {
 
     private var captureMode: CaptureMode = .dualCamera
     var importedPlayer: AVPlayer?
+    @Published var importedImage: UIImage?
+
+    // Duet mode recording support
+    nonisolated(unsafe) private var importedVideoOutput: AVPlayerItemVideoOutput?
+    nonisolated(unsafe) private var importedCIImage: CIImage?
+    nonisolated(unsafe) private var recIsDuetMode: Bool = false
+
+    var isDuetMode: Bool {
+        mediaImporter.isInDuetMode
+    }
 
     private var frontReady = false
     private var backReady = false
@@ -186,7 +197,7 @@ final class CameraViewModel: ObservableObject {
 
     func cleanup() {
         cameraEngine.stopSession()
-        mediaImporter.stopPlayback()
+        mediaImporter.cleanup()
     }
 
     func pauseSession() {
@@ -228,6 +239,7 @@ final class CameraViewModel: ObservableObject {
         recPipScale = layoutEngine.pipScale
         recPipOffset = layoutEngine.pipOffset
         recBorderStyle = layoutEngine.borderStyle
+        recIsDuetMode = mediaImporter.isInDuetMode
     }
 
     func openSystemPhotos() {
@@ -288,8 +300,39 @@ final class CameraViewModel: ObservableObject {
             backBuffer: backFrameBuffer
         )
 
-        guard let frontImage = photos.front, let backImage = photos.back else {
+        guard let frontImage = photos.front else {
             errorMessage = "拍照失败：无法获取摄像头画面"
+            showError = true
+            return
+        }
+
+        // 合拍模式：用导入内容替代后摄
+        let backImage: UIImage?
+        if isDuetMode {
+            if let img = importedImage {
+                backImage = img
+            } else if let vo = importedVideoOutput {
+                let time = vo.itemTime(forHostTime: CACurrentMediaTime())
+                if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
+                    let ci = CIImage(cvPixelBuffer: pb)
+                    let ctx = CIContext()
+                    if let cg = ctx.createCGImage(ci, from: ci.extent) {
+                        backImage = UIImage(cgImage: cg)
+                    } else {
+                        backImage = nil
+                    }
+                } else {
+                    backImage = nil
+                }
+            } else {
+                backImage = nil
+            }
+        } else {
+            backImage = photos.back
+        }
+
+        guard let backImage else {
+            errorMessage = "拍照失败：无法获取画面"
             showError = true
             return
         }
@@ -300,9 +343,7 @@ final class CameraViewModel: ObservableObject {
         )
 
         if let composite = compositeImage {
-            // Save directly to system Photos album
             saveImageToAlbum(composite)
-            // Update thumbnail
             lastSavedThumbnail = composite
         }
     }
@@ -515,7 +556,7 @@ final class CameraViewModel: ObservableObject {
             self.recordingDuration += 1
         }
 
-        if captureMode == .importAndShoot {
+        if isDuetMode && importedPlayer != nil {
             mediaImporter.startPlayback()
         }
     }
@@ -526,8 +567,10 @@ final class CameraViewModel: ObservableObject {
               writer.status == .writing,
               let videoInput = composedVideoInput,
               let adaptor = pixelBufferAdaptor,
-              let frontPB = latestFrontPixelBuffer,
-              let backPB = latestBackPixelBuffer else { return }
+              let frontPB = latestFrontPixelBuffer else { return }
+
+        let backPB = latestBackPixelBuffer
+        if !recIsDuetMode && backPB == nil { return }
 
         // 首帧启动 session
         if !isWritingStarted {
@@ -547,10 +590,6 @@ final class CameraViewModel: ObservableObject {
         let currentPipScale = recPipScale
         let currentPipOffset = recPipOffset
         let currentBorderStyle = recBorderStyle
-
-        // 选择前后摄对应的 pixel buffer
-        let firstPB = currentPanelsSwapped ? frontPB : backPB
-        let secondPB = currentPanelsSwapped ? backPB : frontPB
 
         // 计算目标区域
         let frames: (first: CGRect, second: CGRect)
@@ -587,9 +626,31 @@ final class CameraViewModel: ObservableObject {
             }
         }
 
-        // 用 CIImage 合成
-        let firstCI = CIImage(cvPixelBuffer: firstPB)
-        let secondCI = CIImage(cvPixelBuffer: secondPB)
+        // 获取 CIImage（合拍模式用导入内容替代后摄）
+        let frontCI = CIImage(cvPixelBuffer: frontPB)
+        let backCI: CIImage
+        if recIsDuetMode {
+            if let vo = importedVideoOutput {
+                let time = vo.itemTime(forHostTime: CACurrentMediaTime())
+                if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
+                    backCI = CIImage(cvPixelBuffer: pb)
+                } else if let img = importedCIImage {
+                    backCI = img
+                } else {
+                    return
+                }
+            } else if let img = importedCIImage {
+                backCI = img
+            } else {
+                return
+            }
+        } else {
+            guard let bpb = backPB else { return }
+            backCI = CIImage(cvPixelBuffer: bpb)
+        }
+
+        let firstCI = currentPanelsSwapped ? frontCI : backCI
+        let secondCI = currentPanelsSwapped ? backCI : frontCI
 
         var composite = CIImage(color: .black).cropped(to: CGRect(origin: .zero, size: currentOutputSize))
         let h = currentOutputSize.height
@@ -689,8 +750,8 @@ final class CameraViewModel: ObservableObject {
         guard isRecording else { return }
         isRecording = false
 
-        if captureMode == .importAndShoot {
-            mediaImporter.stopPlayback()
+        if isDuetMode {
+            mediaImporter.pausePlayback()
         }
 
         // 完成写入并保存
@@ -735,16 +796,53 @@ final class CameraViewModel: ObservableObject {
         syncRecordingSnapshot()
     }
 
-    func handlePickedVideo(_ result: PHPickerResult) {
+    func handlePickedMedia(_ result: PHPickerResult) {
         Task {
             do {
-                let url = try await mediaImporter.importVideo(from: result)
-                importedPlayer = mediaImporter.createPlayer(for: url)
+                if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                    let url = try await mediaImporter.importVideo(from: result)
+                    let player = mediaImporter.createPlayer(for: url)
+                    importedPlayer = player
+                    importedImage = nil
+
+                    // 设置视频输出用于录制时抓帧
+                    let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
+                        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+                    ])
+                    player.currentItem?.add(output)
+                    importedVideoOutput = output
+                    importedCIImage = nil
+
+                    // 视频播放结束自动停止录制
+                    mediaImporter.onVideoDidEnd = { [weak self] in
+                        guard let self, self.isRecording else { return }
+                        self.stopRecording()
+                    }
+                } else {
+                    try await mediaImporter.importImage(from: result)
+                    if case .image(let image) = mediaImporter.importedContent {
+                        importedImage = image
+                        importedPlayer = nil
+                        importedVideoOutput = nil
+                        importedCIImage = CIImage(image: image)
+                    }
+                }
+                syncRecordingSnapshot()
             } catch {
                 errorMessage = error.localizedDescription
                 showError = true
             }
         }
+    }
+
+    func exitDuetMode() {
+        mediaImporter.exitDuetMode()
+        importedPlayer = nil
+        importedImage = nil
+        importedVideoOutput = nil
+        importedCIImage = nil
+        recIsDuetMode = false
+        syncRecordingSnapshot()
     }
 }
 

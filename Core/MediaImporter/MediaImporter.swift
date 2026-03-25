@@ -3,20 +3,36 @@ import SwiftUI
 import AVFoundation
 import Combine
 
-/// 媒体导入模块 — 从相册选择视频并同步播放
+/// 导入内容类型
+enum ImportedContent {
+    case video(url: URL, player: AVPlayer)
+    case image(UIImage)
+}
+
+/// 媒体导入模块 — 从相册选择视频或图片用于合拍
 final class MediaImporter: ObservableObject {
-    @Published var importedVideoURL: URL?
+    @Published var importedContent: ImportedContent?
     @Published var isImporting = false
     @Published var error: ImporterError?
     @Published var thumbnailImage: UIImage?
 
     private var player: AVPlayer?
-    private var playerLooper: AVPlayerLooper?
-    private var queuePlayer: AVQueuePlayer?
+    private var endObserver: Any?
 
-    // MARK: - Public API
+    /// 视频播放结束回调
+    var onVideoDidEnd: (() -> Void)?
 
-    /// 从 PHPickerResult 导入视频
+    var importedVideoURL: URL? {
+        if case .video(let url, _) = importedContent { return url }
+        return nil
+    }
+
+    var isInDuetMode: Bool {
+        importedContent != nil
+    }
+
+    // MARK: - Import Video
+
     func importVideo(from result: PHPickerResult) async throws -> URL {
         await MainActor.run { isImporting = true }
 
@@ -35,8 +51,6 @@ final class MediaImporter: ObservableObject {
                     continuation.resume(throwing: ImporterError.loadFailed("URL 为空"))
                     return
                 }
-
-                // Copy to temp directory (source file is temporary)
                 let tempURL = FileManager.default.temporaryDirectory
                     .appendingPathComponent("splitcam_import_\(UUID().uuidString).mp4")
                 do {
@@ -48,11 +62,21 @@ final class MediaImporter: ObservableObject {
             }
         }
 
-        // Generate thumbnail
         let thumbnail = try await generateThumbnail(for: url)
+        let player = AVPlayer(playerItem: AVPlayerItem(url: url))
+        self.player = player
+
+        // 监听视频播放结束
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: player.currentItem,
+            queue: .main
+        ) { [weak self] _ in
+            self?.onVideoDidEnd?()
+        }
 
         await MainActor.run {
-            self.importedVideoURL = url
+            self.importedContent = .video(url: url, player: player)
             self.thumbnailImage = thumbnail
             self.isImporting = false
         }
@@ -60,46 +84,84 @@ final class MediaImporter: ObservableObject {
         return url
     }
 
-    /// 创建用于同步播放的 AVPlayer
-    func createPlayer(for url: URL) -> AVPlayer {
-        let playerItem = AVPlayerItem(url: url)
-        let player = AVPlayer(playerItem: playerItem)
-        self.player = player
-        return player
+    // MARK: - Import Image
+
+    func importImage(from result: PHPickerResult) async throws {
+        await MainActor.run { isImporting = true }
+
+        guard result.itemProvider.canLoadObject(ofClass: UIImage.self) else {
+            await MainActor.run { isImporting = false }
+            throw ImporterError.invalidFormat
+        }
+
+        let image = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UIImage, Error>) in
+            result.itemProvider.loadObject(ofClass: UIImage.self) { object, error in
+                if let error {
+                    continuation.resume(throwing: ImporterError.loadFailed(error.localizedDescription))
+                    return
+                }
+                guard let image = object as? UIImage else {
+                    continuation.resume(throwing: ImporterError.loadFailed("无法加载图片"))
+                    return
+                }
+                continuation.resume(returning: image)
+            }
+        }
+
+        await MainActor.run {
+            self.importedContent = .image(image)
+            self.thumbnailImage = image
+            self.isImporting = false
+        }
     }
 
-    /// 开始播放（与录制同步）
+    // MARK: - Playback
+
+    func createPlayer(for url: URL) -> AVPlayer {
+        if let player { return player }
+        let p = AVPlayer(playerItem: AVPlayerItem(url: url))
+        self.player = p
+        return p
+    }
+
     func startPlayback() {
         player?.seek(to: .zero)
         player?.play()
     }
 
-    /// 暂停播放
     func pausePlayback() {
         player?.pause()
     }
 
-    /// 停止并重置
     func stopPlayback() {
         player?.pause()
         player?.seek(to: .zero)
     }
 
-    /// 获取导入视频的时长
     func videoDuration(for url: URL) async throws -> TimeInterval {
         let asset = AVURLAsset(url: url)
         let duration = try await asset.load(.duration)
         return CMTimeGetSeconds(duration)
     }
 
-    /// 清理导入的临时文件
-    func cleanup() {
+    // MARK: - Exit Duet Mode
+
+    func exitDuetMode() {
         if let url = importedVideoURL {
             try? FileManager.default.removeItem(at: url)
         }
-        importedVideoURL = nil
+        if let observer = endObserver {
+            NotificationCenter.default.removeObserver(observer)
+            endObserver = nil
+        }
+        importedContent = nil
         thumbnailImage = nil
         player = nil
+        onVideoDidEnd = nil
+    }
+
+    func cleanup() {
+        exitDuetMode()
     }
 
     // MARK: - Private
@@ -109,19 +171,18 @@ final class MediaImporter: ObservableObject {
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 300, height: 300)
-
         let (image, _) = try await generator.image(at: .zero)
         return UIImage(cgImage: image)
     }
 }
 
-// MARK: - PHPicker Configuration
+// MARK: - PHPicker Configuration (Video + Image)
 
-struct VideoPickerConfig {
+struct MediaPickerConfig {
     static var configuration: PHPickerConfiguration {
         var config = PHPickerConfiguration(photoLibrary: .shared())
         config.selectionLimit = 1
-        config.filter = .videos
+        config.filter = .any(of: [.videos, .images])
         config.preferredAssetRepresentationMode = .current
         return config
     }
@@ -129,12 +190,45 @@ struct VideoPickerConfig {
 
 // MARK: - SwiftUI PHPicker Wrapper
 
+struct MediaPicker: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
+    let onPick: (PHPickerResult) -> Void
+
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        let picker = PHPickerViewController(configuration: MediaPickerConfig.configuration)
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        let parent: MediaPicker
+
+        init(_ parent: MediaPicker) {
+            self.parent = parent
+        }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            parent.isPresented = false
+            guard let result = results.first else { return }
+            parent.onPick(result)
+        }
+    }
+}
+
+// MARK: - Legacy VideoPicker (kept for compatibility)
+
 struct VideoPicker: UIViewControllerRepresentable {
     @Binding var isPresented: Bool
     let onPick: (PHPickerResult) -> Void
 
     func makeUIViewController(context: Context) -> PHPickerViewController {
-        let picker = PHPickerViewController(configuration: VideoPickerConfig.configuration)
+        let picker = PHPickerViewController(configuration: MediaPickerConfig.configuration)
         picker.delegate = context.coordinator
         return picker
     }
@@ -169,8 +263,8 @@ enum ImporterError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidFormat: return "不支持的视频格式"
-        case .loadFailed(let msg): return "视频加载失败：\(msg)"
+        case .invalidFormat: return "不支持的格式"
+        case .loadFailed(let msg): return "加载失败：\(msg)"
         case .permissionDenied: return "请在设置中允许 SplitCam 访问相册"
         }
     }

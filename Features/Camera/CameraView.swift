@@ -18,6 +18,11 @@ struct CameraView: View {
                 topBar
                     .padding(.top, 8)
 
+                // 合拍模式指示条
+                if viewModel.isDuetMode {
+                    duetModeBar
+                }
+
                 // 中间：分屏预览（自适应高度，不覆盖底部控制）
                 splitPreview
                     .padding(.horizontal, 4)
@@ -65,8 +70,8 @@ struct CameraView: View {
             viewModel.pauseSession()
         }
         .sheet(isPresented: $viewModel.showVideoPicker) {
-            VideoPicker(isPresented: $viewModel.showVideoPicker) { result in
-                viewModel.handlePickedVideo(result)
+            MediaPicker(isPresented: $viewModel.showVideoPicker) { result in
+                viewModel.handlePickedMedia(result)
             }
         }
         .alert("错误", isPresented: $viewModel.showError) {
@@ -82,6 +87,28 @@ struct CameraView: View {
         case .topBottom: return "rectangle.split.1x2"
         case .pip: return "pip"
         }
+    }
+
+    // MARK: - Duet Mode Bar
+
+    private var duetModeBar: some View {
+        HStack {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 12))
+            Text("合拍模式")
+                .font(.system(size: 13, weight: .medium))
+            Spacer()
+            if !viewModel.isRecording {
+                Button(action: { viewModel.exitDuetMode() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                }
+            }
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(Color.blue.opacity(0.6))
     }
 
     // MARK: - Processing Overlay
@@ -109,12 +136,14 @@ struct CameraView: View {
             SplitPreviewView(layout: viewModel.layoutEngine, isDraggingBinding: $viewModel.isDraggingDivider) {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.frontFrameBuffer : viewModel.backFrameBuffer,
-                    player: viewModel.panelsSwapped ? nil : viewModel.importedPlayer
+                    player: viewModel.panelsSwapped ? nil : viewModel.importedPlayer,
+                    importedImage: viewModel.panelsSwapped ? nil : viewModel.importedImage
                 )
             } secondContent: {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.backFrameBuffer : viewModel.frontFrameBuffer,
-                    player: viewModel.panelsSwapped ? viewModel.importedPlayer : nil
+                    player: viewModel.panelsSwapped ? viewModel.importedPlayer : nil,
+                    importedImage: viewModel.panelsSwapped ? viewModel.importedImage : nil
                 )
             }
             .frame(width: previewSize.width, height: previewSize.height)
@@ -362,6 +391,7 @@ struct CameraView: View {
 struct CameraPreviewPanel: View {
     let sampleBuffer: CMSampleBuffer?
     let player: AVPlayer?
+    var importedImage: UIImage?
 
     var body: some View {
         ZStack {
@@ -369,6 +399,10 @@ struct CameraPreviewPanel: View {
 
             if let player {
                 VideoPlayerView(player: player)
+            } else if let importedImage {
+                Image(uiImage: importedImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
             } else if let buffer = sampleBuffer {
                 SampleBufferDisplayView(sampleBuffer: buffer)
             } else {
