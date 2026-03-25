@@ -49,8 +49,6 @@ final class CameraViewModel: ObservableObject {
     private var captureMode: CaptureMode = .dualCamera
     @Published var importedPlayer: AVPlayer?
     @Published var importedImage: UIImage?
-    @Published var debugText: String = ""
-
     @Published var importedVideoBuffer: CMSampleBuffer?
 
     // Duet mode recording support
@@ -325,17 +323,31 @@ final class CameraViewModel: ObservableObject {
             self.showFlashEffect = false
         }
 
-        let photos = cameraEngine.capturePhoto(
-            frontBuffer: frontFrameBuffer,
-            backBuffer: backFrameBuffer
-        )
+        // 使用 ISP 管线拍照（Deep Fusion / Smart HDR）
+        cameraEngine.capturePhotoWithISP { [weak self] backPhoto, frontPhoto in
+            guard let self else { return }
+            Task { @MainActor in
+                self.processISPPhotos(backPhoto: backPhoto, frontPhoto: frontPhoto)
+            }
+        }
+    }
 
-        guard let frontImage = photos.front else {
-            errorMessage = "拍照失败：无法获取摄像头画面"
-            showError = true
+    private func processISPPhotos(backPhoto: UIImage?, frontPhoto: UIImage?) {
+        guard let frontImage = frontPhoto else {
+            // ISP 拍照失败，降级使用帧缓冲区
+            guard let fb = frontFrameBuffer,
+                  let fi = cameraEngine.imageFromBuffer(fb) else {
+                errorMessage = "拍照失败：无法获取摄像头画面"
+                showError = true
+                return
+            }
+            processCapturedPhotos(frontImage: fi, backPhotoFromISP: backPhoto)
             return
         }
+        processCapturedPhotos(frontImage: frontImage, backPhotoFromISP: backPhoto)
+    }
 
+    private func processCapturedPhotos(frontImage: UIImage, backPhotoFromISP: UIImage?) {
         // 合拍模式：用导入内容替代后摄
         let backImage: UIImage?
         if isDuetMode {
@@ -344,7 +356,6 @@ final class CameraViewModel: ObservableObject {
             } else if let vo = importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    // videoComposition 已应用 preferredTransform，无需额外旋转
                     let ci = CIImage(cvPixelBuffer: pb, options: [
                         .colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
                     ])
@@ -361,7 +372,14 @@ final class CameraViewModel: ObservableObject {
                 backImage = nil
             }
         } else {
-            backImage = photos.back
+            // 优先使用 ISP 拍摄结果，降级使用帧缓冲区
+            if let bp = backPhotoFromISP {
+                backImage = bp
+            } else if let bb = backFrameBuffer {
+                backImage = cameraEngine.imageFromBuffer(bb)
+            } else {
+                backImage = nil
+            }
         }
 
         guard let backImage else {
@@ -528,14 +546,16 @@ final class CameraViewModel: ObservableObject {
         do {
             let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 
+            // 根据分辨率动态调整码率：1080P → 20 Mbps, 4K → 50 Mbps
+            let videoBitRate: Int = resolutionQuality == .uhd4k ? 50_000_000 : 20_000_000
             let videoSettings: [String: Any] = [
-                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoCodecKey: AVVideoCodecType.hevc,
                 AVVideoWidthKey: Int(outputSize.width),
                 AVVideoHeightKey: Int(outputSize.height),
                 AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: 8_000_000,
-                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
-                ]
+                    AVVideoAverageBitRateKey: videoBitRate,
+                    AVVideoExpectedSourceFrameRateKey: 30
+                ] as [String: Any]
             ]
 
             let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
@@ -701,6 +721,15 @@ final class CameraViewModel: ObservableObject {
             composite = fittedSecond.composited(over: composite)
         }
 
+        // 轻度锐化提升清晰度
+        if let sharpen = CIFilter(name: "CISharpenLuminance") {
+            sharpen.setValue(composite, forKey: kCIInputImageKey)
+            sharpen.setValue(0.4, forKey: kCIInputSharpnessKey)
+            if let sharpened = sharpen.outputImage {
+                composite = sharpened
+            }
+        }
+
         // 渲染到 pixel buffer
         guard let pool = adaptor.pixelBufferPool else { return }
         var outputBuffer: CVPixelBuffer?
@@ -848,16 +877,13 @@ final class CameraViewModel: ObservableObject {
     }
 
     func handlePickedMedia(_ result: PHPickerResult) {
-        debugText = "① 开始导入..."
+        // 开始导入
         Task {
             do {
                 if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
-                    debugText = "② 正在加载视频..."
                     let url = try await mediaImporter.importVideo(from: result)
-                    debugText = "③ 视频加载完成，生成缩略图..."
                     let player = mediaImporter.createPlayer(for: url)
                     let thumb = mediaImporter.thumbnailImage
-                    debugText = "④ thumb=\(thumb != nil) size=\(thumb?.size ?? .zero) swap=\(panelsSwapped)"
                     importedImage = thumb
                     importedPlayer = player
 
@@ -888,14 +914,11 @@ final class CameraViewModel: ObservableObject {
                     importedCIImage = nil
 
                     // 加载视频方向
-                    let asset = AVURLAsset(url: url)
-                    if let track = try? await asset.loadTracks(withMediaType: .video).first {
+                    let orientAsset = AVURLAsset(url: url)
+                    if let track = try? await orientAsset.loadTracks(withMediaType: .video).first {
                         let transform = try? await track.load(.preferredTransform)
-                        let naturalSize = try? await track.load(.naturalSize)
                         if let t = transform {
                             importedVideoOrientation = Self.orientationFromTransform(t)
-                            let angle = atan2(t.b, t.a) * 180 / .pi
-                            debugText = "方向: \(importedVideoOrientation.rawValue) 角度: \(Int(angle))° 尺寸: \(naturalSize ?? .zero)"
                         } else {
                             importedVideoOrientation = .up
                         }
@@ -919,7 +942,6 @@ final class CameraViewModel: ObservableObject {
                 }
                 syncRecordingSnapshot()
             } catch {
-                debugText = "❌ 导入失败: \(error.localizedDescription)"
                 errorMessage = error.localizedDescription
                 showError = true
             }

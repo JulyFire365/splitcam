@@ -29,6 +29,14 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     private var backVideoOutput: AVCaptureVideoDataOutput?
     private var backConnection: AVCaptureConnection?
 
+    // Photo (系统 ISP 管线拍照)
+    private var backPhotoOutput: AVCapturePhotoOutput?
+    private var frontPhotoOutput: AVCapturePhotoOutput?
+    private var photoCaptureCompletion: ((UIImage?, UIImage?) -> Void)?
+    private var capturedBackPhoto: UIImage?
+    private var capturedFrontPhoto: UIImage?
+    private var photoCaptureCount = 0
+
     // Audio
     private var audioDeviceInput: AVCaptureDeviceInput?
     private var audioOutput: AVCaptureAudioDataOutput?
@@ -153,16 +161,47 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         }
     }
 
-    // MARK: - Photo Capture
+    // MARK: - Photo Capture (系统 ISP 管线)
 
-    /// 从当前帧捕获照片 (返回前后摄像头的 UIImage)
-    func capturePhoto(frontBuffer: CMSampleBuffer?, backBuffer: CMSampleBuffer?) -> (front: UIImage?, back: UIImage?) {
-        let frontImage = frontBuffer.flatMap { imageFromBuffer($0) }
-        let backImage = backBuffer.flatMap { imageFromBuffer($0) }
-        return (front: frontImage, back: backImage)
+    /// 使用 AVCapturePhotoOutput 拍照（Deep Fusion / Smart HDR）
+    func capturePhotoWithISP(completion: @escaping (UIImage?, UIImage?) -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            self.photoCaptureCompletion = completion
+            self.capturedBackPhoto = nil
+            self.capturedFrontPhoto = nil
+            self.photoCaptureCount = 0
+
+            let totalCaptures = (self.backPhotoOutput != nil ? 1 : 0) + (self.frontPhotoOutput != nil ? 1 : 0)
+            guard totalCaptures > 0 else {
+                DispatchQueue.main.async { completion(nil, nil) }
+                return
+            }
+
+            // 后摄拍照
+            if let backOutput = self.backPhotoOutput {
+                let settings = AVCapturePhotoSettings()
+                settings.isHighResolutionPhotoEnabled = true
+                if backOutput.availablePhotoCodecTypes.contains(.hevc) {
+                    settings.photoQualityPrioritization = .quality
+                }
+                backOutput.capturePhoto(with: settings, delegate: self)
+            }
+
+            // 前摄拍照
+            if let frontOutput = self.frontPhotoOutput {
+                let settings = AVCapturePhotoSettings()
+                settings.isHighResolutionPhotoEnabled = true
+                if frontOutput.availablePhotoCodecTypes.contains(.hevc) {
+                    settings.photoQualityPrioritization = .quality
+                }
+                frontOutput.capturePhoto(with: settings, delegate: self)
+            }
+        }
     }
 
-    private func imageFromBuffer(_ buffer: CMSampleBuffer) -> UIImage? {
+    /// 兼容旧方式：从帧缓冲区截取（合拍模式降级使用）
+    func imageFromBuffer(_ buffer: CMSampleBuffer) -> UIImage? {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(buffer) else { return nil }
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         let context = CIContext()
@@ -284,6 +323,22 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                     backCamera.videoZoomFactor = wide
                     backCamera.unlockForConfiguration()
                 }
+
+                // 后摄 Photo Output（ISP 管线拍照）
+                let backPhoto = AVCapturePhotoOutput()
+                backPhoto.isHighResolutionCaptureEnabled = true
+                backPhoto.maxPhotoQualityPrioritization = .quality
+                if multiCamSession.canAddOutput(backPhoto) {
+                    multiCamSession.addOutputWithNoConnections(backPhoto)
+                    if let photoPort = input.ports(for: .video, sourceDeviceType: backCamera.deviceType, sourceDevicePosition: .back).first {
+                        let photoConn = AVCaptureConnection(inputPorts: [photoPort], output: backPhoto)
+                        if multiCamSession.canAddConnection(photoConn) {
+                            multiCamSession.addConnection(photoConn)
+                            photoConn.videoOrientation = .portrait
+                        }
+                    }
+                    backPhotoOutput = backPhoto
+                }
             } catch {
                 DispatchQueue.main.async { self.error = .configurationFailed(error.localizedDescription) }
             }
@@ -319,6 +374,23 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                 }
 
                 configureDevice(frontCamera, resolution: resolution)
+
+                // 前摄 Photo Output（ISP 管线拍照）
+                let frontPhoto = AVCapturePhotoOutput()
+                frontPhoto.isHighResolutionCaptureEnabled = true
+                frontPhoto.maxPhotoQualityPrioritization = .quality
+                if multiCamSession.canAddOutput(frontPhoto) {
+                    multiCamSession.addOutputWithNoConnections(frontPhoto)
+                    if let photoPort = input.ports(for: .video, sourceDeviceType: frontCamera.deviceType, sourceDevicePosition: .front).first {
+                        let photoConn = AVCaptureConnection(inputPorts: [photoPort], output: frontPhoto)
+                        if multiCamSession.canAddConnection(photoConn) {
+                            multiCamSession.addConnection(photoConn)
+                            photoConn.videoOrientation = .portrait
+                            photoConn.isVideoMirrored = true
+                        }
+                    }
+                    frontPhotoOutput = frontPhoto
+                }
             } catch {
                 DispatchQueue.main.async { self.error = .configurationFailed(error.localizedDescription) }
             }
@@ -365,6 +437,11 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         if device.activeColorSpace != .P3_D65 &&
            device.activeFormat.supportedColorSpaces.contains(.P3_D65) {
             device.activeColorSpace = .P3_D65
+        }
+
+        // 启用镜头畸变校正（提升画质清晰度）
+        if device.isGeometricDistortionCorrectionSupported {
+            device.isGeometricDistortionCorrectionEnabled = true
         }
 
         device.unlockForConfiguration()
@@ -510,6 +587,40 @@ extension CameraEngine: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureA
             if isRecording && isWritingStarted,
                let input = audioWriterInput, input.isReadyForMoreMediaData {
                 input.append(sampleBuffer)
+            }
+        }
+    }
+}
+
+// MARK: - AVCapturePhotoCaptureDelegate
+
+extension CameraEngine: AVCapturePhotoCaptureDelegate {
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        guard error == nil, let data = photo.fileDataRepresentation(),
+              let image = UIImage(data: data) else {
+            // 拍照失败也要计数，避免死锁
+            handlePhotoCaptured(image: nil, isBack: output == backPhotoOutput)
+            return
+        }
+        handlePhotoCaptured(image: image, isBack: output == backPhotoOutput)
+    }
+
+    private func handlePhotoCaptured(image: UIImage?, isBack: Bool) {
+        if isBack {
+            capturedBackPhoto = image
+        } else {
+            capturedFrontPhoto = image
+        }
+        photoCaptureCount += 1
+
+        let totalExpected = (backPhotoOutput != nil ? 1 : 0) + (frontPhotoOutput != nil ? 1 : 0)
+        if photoCaptureCount >= totalExpected {
+            let back = capturedBackPhoto
+            let front = capturedFrontPhoto
+            let completion = photoCaptureCompletion
+            photoCaptureCompletion = nil
+            DispatchQueue.main.async {
+                completion?(back, front)
             }
         }
     }
