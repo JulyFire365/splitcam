@@ -136,14 +136,14 @@ struct CameraView: View {
             SplitPreviewView(layout: viewModel.layoutEngine, isDraggingBinding: $viewModel.isDraggingDivider) {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.frontFrameBuffer : viewModel.backFrameBuffer,
-                    player: viewModel.panelsSwapped ? nil : viewModel.importedPlayer,
-                    importedImage: viewModel.panelsSwapped ? nil : viewModel.importedImage
+                    importedImage: viewModel.panelsSwapped ? nil : viewModel.importedImage,
+                    importedVideoBuffer: viewModel.panelsSwapped ? nil : viewModel.importedVideoBuffer
                 )
             } secondContent: {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.backFrameBuffer : viewModel.frontFrameBuffer,
-                    player: viewModel.panelsSwapped ? viewModel.importedPlayer : nil,
-                    importedImage: viewModel.panelsSwapped ? viewModel.importedImage : nil
+                    importedImage: viewModel.panelsSwapped ? viewModel.importedImage : nil,
+                    importedVideoBuffer: viewModel.panelsSwapped ? viewModel.importedVideoBuffer : nil
                 )
             }
             .frame(width: previewSize.width, height: previewSize.height)
@@ -390,15 +390,15 @@ struct CameraView: View {
 
 struct CameraPreviewPanel: View {
     let sampleBuffer: CMSampleBuffer?
-    let player: AVPlayer?
     var importedImage: UIImage?
+    var importedVideoBuffer: CMSampleBuffer?
 
     var body: some View {
         ZStack {
             Color.black
 
-            if let player {
-                VideoPlayerView(player: player)
+            if let importedVideoBuffer {
+                SampleBufferDisplayView(sampleBuffer: importedVideoBuffer)
             } else if let importedImage {
                 Image(uiImage: importedImage)
                     .resizable()

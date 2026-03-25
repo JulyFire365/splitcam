@@ -48,10 +48,13 @@ final class CameraViewModel: ObservableObject {
     var importedPlayer: AVPlayer?
     @Published var importedImage: UIImage?
 
+    @Published var importedVideoBuffer: CMSampleBuffer?
+
     // Duet mode recording support
     nonisolated(unsafe) private var importedVideoOutput: AVPlayerItemVideoOutput?
     nonisolated(unsafe) private var importedCIImage: CIImage?
     nonisolated(unsafe) private var recIsDuetMode: Bool = false
+    nonisolated(unsafe) private var latestImportedPixelBuffer: CVPixelBuffer?
 
     var isDuetMode: Bool {
         mediaImporter.isInDuetMode
@@ -158,6 +161,21 @@ final class CameraViewModel: ObservableObject {
         cameraEngine.onBackFrameForRecording = { [weak self] buffer in
             guard let self else { return }
             self.latestBackPixelBuffer = CMSampleBufferGetImageBuffer(buffer)
+
+            // 合拍模式：抓取导入视频帧（用于合成 + 预览）
+            if self.recIsDuetMode, let vo = self.importedVideoOutput {
+                let time = vo.itemTime(forHostTime: CACurrentMediaTime())
+                if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
+                    self.latestImportedPixelBuffer = pb
+                    let pts = CMSampleBufferGetPresentationTimeStamp(buffer)
+                    if let sb = self.createSampleBufferFromPixelBuffer(pb, timestamp: pts) {
+                        DispatchQueue.main.async {
+                            self.importedVideoBuffer = sb
+                        }
+                    }
+                }
+            }
+
             // 以后摄帧为基准触发合成写入
             self.composeAndWriteFrame(timestamp: CMSampleBufferGetPresentationTimeStamp(buffer))
         }
@@ -630,15 +648,8 @@ final class CameraViewModel: ObservableObject {
         let frontCI = CIImage(cvPixelBuffer: frontPB)
         let backCI: CIImage
         if recIsDuetMode {
-            if let vo = importedVideoOutput {
-                let time = vo.itemTime(forHostTime: CACurrentMediaTime())
-                if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    backCI = CIImage(cvPixelBuffer: pb)
-                } else if let img = importedCIImage {
-                    backCI = img
-                } else {
-                    return
-                }
+            if let pb = latestImportedPixelBuffer {
+                backCI = CIImage(cvPixelBuffer: pb)
             } else if let img = importedCIImage {
                 backCI = img
             } else {
@@ -682,6 +693,18 @@ final class CameraViewModel: ObservableObject {
               let audioInput = composedAudioInput,
               audioInput.isReadyForMoreMediaData else { return }
         audioInput.append(buffer)
+    }
+
+    /// 从 CVPixelBuffer 创建 CMSampleBuffer（用于预览显示）
+    private nonisolated func createSampleBufferFromPixelBuffer(_ pixelBuffer: CVPixelBuffer, timestamp: CMTime) -> CMSampleBuffer? {
+        var formatDesc: CMVideoFormatDescription?
+        CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: pixelBuffer, formatDescriptionOut: &formatDesc)
+        guard let format = formatDesc else { return nil }
+
+        var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: timestamp, decodeTimeStamp: .invalid)
+        var sampleBuffer: CMSampleBuffer?
+        CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: pixelBuffer, formatDescription: format, sampleTiming: &timing, sampleBufferOut: &sampleBuffer)
+        return sampleBuffer
     }
 
     /// CIImage aspect fill + clip（与 VideoComposer 中相同逻辑）
@@ -749,6 +772,8 @@ final class CameraViewModel: ObservableObject {
     private func stopRecording() {
         guard isRecording else { return }
         isRecording = false
+        importedVideoBuffer = nil
+        latestImportedPixelBuffer = nil
 
         if isDuetMode {
             mediaImporter.pausePlayback()
@@ -803,7 +828,7 @@ final class CameraViewModel: ObservableObject {
                     let url = try await mediaImporter.importVideo(from: result)
                     let player = mediaImporter.createPlayer(for: url)
                     importedPlayer = player
-                    importedImage = nil
+                    importedImage = mediaImporter.thumbnailImage
 
                     // 设置视频输出用于录制时抓帧
                     let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
@@ -839,8 +864,10 @@ final class CameraViewModel: ObservableObject {
         mediaImporter.exitDuetMode()
         importedPlayer = nil
         importedImage = nil
+        importedVideoBuffer = nil
         importedVideoOutput = nil
         importedCIImage = nil
+        latestImportedPixelBuffer = nil
         recIsDuetMode = false
         syncRecordingSnapshot()
     }
