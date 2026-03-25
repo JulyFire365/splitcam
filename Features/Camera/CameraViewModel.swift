@@ -946,20 +946,24 @@ final class CameraViewModel: ObservableObject {
 
     // MARK: - Orientation Helper
 
-    /// 从 AVAssetTrack 的 preferredTransform 推导 CGImagePropertyOrientation
-    /// 使用 atan2 角度检测，避免浮点精度问题
+    /// 从 AVAssetTrack 的 preferredTransform 推导用于 CIImage.oriented() 的方向
+    ///
+    /// 关键：preferredTransform 在 UIKit 坐标系（Y轴向下），
+    /// 但 CIImage 坐标系 Y轴向上，所以旋转方向需要反转：
+    /// - UIKit 90° CW  → CIImage 需要 .left（90° CCW）
+    /// - UIKit 90° CCW → CIImage 需要 .right（90° CW）
     private static func orientationFromTransform(_ t: CGAffineTransform) -> CGImagePropertyOrientation {
-        let angle = atan2(t.b, t.a) // 弧度
+        let angle = atan2(t.b, t.a)
         let degrees = angle * 180.0 / .pi
 
         if abs(degrees - 90) < 10 {
-            return .right      // 90° CW（iPhone 竖拍）
+            return .left       // UIKit 90° CW → CIImage .left
         } else if abs(degrees + 90) < 10 || abs(degrees - 270) < 10 {
-            return .left       // 270° CW
+            return .right      // UIKit 90° CCW → CIImage .right
         } else if abs(abs(degrees) - 180) < 10 {
-            return .down       // 180°
+            return .down       // 180°（方向一致）
         }
-        return .up             // 0°（横拍/无旋转）
+        return .up             // 0°（无旋转）
     }
 }
 
