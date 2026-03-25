@@ -21,6 +21,7 @@ final class CameraViewModel: ObservableObject {
     @Published var shootingMode: ShootingMode = .video
     @Published var aspectRatio: AspectRatioMode = .ratio9_16
     @Published var resolution: CaptureResolution = .hd1080p
+    @Published var resolutionQuality: ResolutionQuality = .hd1080p
     @Published var zoomLevel: ZoomLevel = .wide
     @Published var showVideoPicker = false
     @Published var showError = false
@@ -97,6 +98,15 @@ final class CameraViewModel: ObservableObject {
     nonisolated(unsafe) private var recBorderStyle: BorderStyleConfig = .default
 
     // MARK: - Computed
+
+    /// 当前导出分辨率（根据比例 + 画质）
+    var currentExportSize: CGSize {
+        let base = aspectRatio.exportSize
+        if resolutionQuality == .uhd4k {
+            return CGSize(width: base.width * 2, height: base.height * 2)
+        }
+        return base
+    }
 
     var formattedDuration: String {
         let minutes = Int(recordingDuration) / 60
@@ -249,7 +259,12 @@ final class CameraViewModel: ObservableObject {
 
     /// 同步布局参数到录制线程可访问的快照
     func syncRecordingSnapshot() {
-        recOutputSize = aspectRatio.exportSize
+        let baseSize = aspectRatio.exportSize
+        if resolutionQuality == .uhd4k {
+            recOutputSize = CGSize(width: baseSize.width * 2, height: baseSize.height * 2)
+        } else {
+            recOutputSize = baseSize
+        }
         recSplitMode = splitMode
         recSplitRatio = layoutEngine.splitRatio
         recPanelsSwapped = panelsSwapped
@@ -372,7 +387,7 @@ final class CameraViewModel: ObservableObject {
     }
 
     private func composeSplitPhoto(first: UIImage, second: UIImage) -> UIImage? {
-        let outputSize = aspectRatio.exportSize
+        let outputSize = currentExportSize
         let renderer = UIGraphicsImageRenderer(size: outputSize)
 
         return renderer.image { context in
@@ -510,7 +525,7 @@ final class CameraViewModel: ObservableObject {
 
     private func startRecording() {
         syncRecordingSnapshot()
-        let outputSize = aspectRatio.exportSize
+        let outputSize = currentExportSize
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("splitcam_composed_\(UUID().uuidString).mp4")
         composedOutputURL = outputURL

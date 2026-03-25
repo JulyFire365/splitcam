@@ -36,12 +36,11 @@ struct CameraView: View {
                            value: viewModel.camerasReady)
                 .allowsHitTesting(false)
 
-            // ⑤ 闪光效果 (拍照)
+            // ⑤ 快门动画 (拍照 — 上下黑幕合拢再展开)
             if viewModel.showFlashEffect {
-                Color.white
+                ShutterAnimationView()
                     .ignoresSafeArea()
-                    .transition(.opacity)
-                    .animation(.easeOut(duration: 0.15), value: viewModel.showFlashEffect)
+                    .allowsHitTesting(false)
             }
 
             // ⑥ 处理中蒙版
@@ -153,22 +152,28 @@ struct CameraView: View {
                 .ignoresSafeArea()
             )
 
-            // 比例选择器 + 合拍标签（录制时隐藏比例）
-            HStack(spacing: 8) {
-                if !viewModel.isRecording {
-                    aspectRatioBar
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+            // 比例选择器 + 合拍标签（录制时隐藏）
+            if !viewModel.isRecording {
+                ZStack {
+                    // 比例栏：无合拍时居中，有合拍时左移
+                    HStack {
+                        aspectRatioBar
+                        if viewModel.isDuetMode { Spacer() }
+                    }
+                    .frame(maxWidth: .infinity)
 
-                Spacer()
-
-                if viewModel.isDuetMode {
-                    duetModeBadge
-                        .transition(.opacity.combined(with: .scale))
+                    // 合拍胶囊：右对齐
+                    if viewModel.isDuetMode {
+                        HStack {
+                            Spacer()
+                            duetModeBadge
+                        }
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
         }
     }
 
@@ -245,7 +250,8 @@ struct CameraView: View {
     // MARK: - Aspect Ratio Bar
 
     private var aspectRatioBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
+            // 比例选项
             ForEach(AspectRatioMode.allCases) { ratio in
                 Button {
                     if ratio != .ratio9_16 && !subscriptionManager.isPro {
@@ -259,7 +265,7 @@ struct CameraView: View {
                     Text(ratio.rawValue)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundColor(viewModel.aspectRatio == ratio ? .white : .white.opacity(0.5))
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(
                             Capsule()
@@ -267,6 +273,14 @@ struct CameraView: View {
                         )
                 }
             }
+
+            // 分隔线
+            Rectangle()
+                .fill(.white.opacity(0.2))
+                .frame(width: 1, height: 16)
+
+            // 画质切换
+            resolutionToggle
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
@@ -276,7 +290,7 @@ struct CameraView: View {
     // MARK: - Zoom Capsule
 
     private var zoomCapsule: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 6) {
             ForEach(ZoomLevel.allCases, id: \.rawValue) { level in
                 Button {
                     if level == .telephoto && !subscriptionManager.isPro {
@@ -409,6 +423,37 @@ struct CameraView: View {
         }
     }
 
+    // MARK: - Resolution Toggle (画质切换)
+
+    private var resolutionToggle: some View {
+        Button {
+            if viewModel.resolutionQuality == .hd1080p {
+                // 4K 是 Pro 功能
+                requirePro(.pipMode) {
+                    withAnimation(.spring(response: 0.3)) {
+                        viewModel.resolutionQuality = .uhd4k
+                        viewModel.syncRecordingSnapshot()
+                    }
+                }
+            } else {
+                withAnimation(.spring(response: 0.3)) {
+                    viewModel.resolutionQuality = .hd1080p
+                    viewModel.syncRecordingSnapshot()
+                }
+            }
+        } label: {
+            Text(viewModel.resolutionQuality.rawValue)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(viewModel.resolutionQuality == .uhd4k ? .yellow : .white.opacity(0.5))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(viewModel.resolutionQuality == .uhd4k ? .yellow.opacity(0.2) : .clear)
+                )
+        }
+    }
+
     // MARK: - Duet Mode Badge (紧凑胶囊)
 
     private var duetModeBadge: some View {
@@ -536,6 +581,51 @@ struct PulseModifier: ViewModifier {
                 value: pulsing
             )
             .onAppear { pulsing = true }
+    }
+}
+
+// MARK: - Shutter Animation (快门动画 — 上下黑幕合拢再展开)
+
+struct ShutterAnimationView: View {
+    @State private var closed = false
+    @State private var done = false
+
+    var body: some View {
+        if !done {
+            ZStack {
+                // 上半幕
+                VStack {
+                    Color.black
+                        .frame(height: UIScreen.main.bounds.height / 2)
+                        .offset(y: closed ? 0 : -UIScreen.main.bounds.height / 2)
+                    Spacer()
+                }
+
+                // 下半幕
+                VStack {
+                    Spacer()
+                    Color.black
+                        .frame(height: UIScreen.main.bounds.height / 2)
+                        .offset(y: closed ? 0 : UIScreen.main.bounds.height / 2)
+                }
+            }
+            .onAppear {
+                // 合拢
+                withAnimation(.easeIn(duration: 0.12)) {
+                    closed = true
+                }
+                // 展开
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        closed = false
+                    }
+                }
+                // 结束
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    done = true
+                }
+            }
+        }
     }
 }
 

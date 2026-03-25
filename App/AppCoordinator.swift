@@ -71,6 +71,13 @@ enum AspectRatioMode: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Resolution Quality
+
+enum ResolutionQuality: String, CaseIterable {
+    case hd1080p = "1080P"
+    case uhd4k   = "4K"
+}
+
 // MARK: - Zoom Level
 
 enum ZoomLevel: CGFloat, CaseIterable {

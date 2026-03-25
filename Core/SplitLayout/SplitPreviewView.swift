@@ -268,27 +268,8 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
     }
 
     private func dragHandle(in containerSize: CGSize) -> some View {
-        let handleWidth: CGFloat = isDragging ? 6 : 4
-        let handleLength: CGFloat = isDragging ? 44 : 36
-        let isH = layout.splitMode == .leftRight
-
-        return Capsule()
-            .fill(.white.opacity(isDragging ? 0.95 : 0.7))
-            .frame(
-                width: isH ? handleWidth : handleLength,
-                height: isH ? handleLength : handleWidth
-            )
-            .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 1)
-            .position(
-                x: layout.splitMode == .leftRight
-                    ? containerSize.width * layout.splitRatio
-                    : containerSize.width / 2,
-                y: layout.splitMode == .topBottom
-                    ? containerSize.height * layout.splitRatio
-                    : containerSize.height / 2
-            )
-            .animation(.easeInOut(duration: 0.15), value: isDragging)
-            .allowsHitTesting(false)
+        // 去掉中间小横条，仅保留分割线 + 箭头引导
+        EmptyView()
     }
 }
 
