@@ -180,13 +180,10 @@ final class CameraViewModel: ObservableObject {
                let vo = self.importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    var ci = CIImage(cvPixelBuffer: pb, options: [
+                    // videoComposition 已应用 preferredTransform，无需额外旋转
+                    let ci = CIImage(cvPixelBuffer: pb, options: [
                         .colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
                     ])
-                    let orientation = self.importedVideoOrientation
-                    if orientation != .up {
-                        ci = ci.oriented(orientation)
-                    }
                     self.latestImportedCIImage = ci
                 }
             }
@@ -347,12 +344,10 @@ final class CameraViewModel: ObservableObject {
             } else if let vo = importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    var ci = CIImage(cvPixelBuffer: pb, options: [
+                    // videoComposition 已应用 preferredTransform，无需额外旋转
+                    let ci = CIImage(cvPixelBuffer: pb, options: [
                         .colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
                     ])
-                    if importedVideoOrientation != .up {
-                        ci = ci.oriented(importedVideoOrientation)
-                    }
                     let ctx = CIContext()
                     if let cg = ctx.createCGImage(ci, from: ci.extent) {
                         backImage = UIImage(cgImage: cg)
