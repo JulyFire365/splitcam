@@ -45,7 +45,7 @@ final class CameraViewModel: ObservableObject {
     // MARK: - State
 
     private var captureMode: CaptureMode = .dualCamera
-    var importedPlayer: AVPlayer?
+    @Published var importedPlayer: AVPlayer?
     @Published var importedImage: UIImage?
 
     @Published var importedVideoBuffer: CMSampleBuffer?
@@ -846,6 +846,8 @@ final class CameraViewModel: ObservableObject {
                     let player = mediaImporter.createPlayer(for: url)
                     importedPlayer = player
                     importedImage = mediaImporter.thumbnailImage
+                    // 预加载第一帧以便预览
+                    player.seek(to: .zero)
 
                     // 设置视频输出（强制 SDR 避免 HDR 户外视频过曝）
                     let output = AVPlayerItemVideoOutput(outputSettings: [

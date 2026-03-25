@@ -137,13 +137,15 @@ struct CameraView: View {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.frontFrameBuffer : viewModel.backFrameBuffer,
                     importedImage: viewModel.panelsSwapped ? nil : viewModel.importedImage,
-                    importedVideoBuffer: viewModel.panelsSwapped ? nil : viewModel.importedVideoBuffer
+                    importedVideoBuffer: viewModel.panelsSwapped ? nil : viewModel.importedVideoBuffer,
+                    importedPlayer: viewModel.panelsSwapped ? nil : viewModel.importedPlayer
                 )
             } secondContent: {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.backFrameBuffer : viewModel.frontFrameBuffer,
                     importedImage: viewModel.panelsSwapped ? viewModel.importedImage : nil,
-                    importedVideoBuffer: viewModel.panelsSwapped ? viewModel.importedVideoBuffer : nil
+                    importedVideoBuffer: viewModel.panelsSwapped ? viewModel.importedVideoBuffer : nil,
+                    importedPlayer: viewModel.panelsSwapped ? viewModel.importedPlayer : nil
                 )
             }
             .frame(width: previewSize.width, height: previewSize.height)
@@ -392,6 +394,7 @@ struct CameraPreviewPanel: View {
     let sampleBuffer: CMSampleBuffer?
     var importedImage: UIImage?
     var importedVideoBuffer: CMSampleBuffer?
+    var importedPlayer: AVPlayer?
 
     var body: some View {
         ZStack {
@@ -399,6 +402,8 @@ struct CameraPreviewPanel: View {
 
             if let importedVideoBuffer {
                 SampleBufferDisplayView(sampleBuffer: importedVideoBuffer)
+            } else if let importedPlayer {
+                VideoPlayerView(player: importedPlayer)
             } else if let importedImage {
                 Image(uiImage: importedImage)
                     .resizable()

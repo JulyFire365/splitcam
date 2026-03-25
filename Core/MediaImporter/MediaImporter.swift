@@ -170,7 +170,7 @@ final class MediaImporter: ObservableObject, @unchecked Sendable {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 300, height: 300)
+        generator.maximumSize = CGSize(width: 1080, height: 1920)
         let (image, _) = try await generator.image(at: .zero)
         return UIImage(cgImage: image)
     }
