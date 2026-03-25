@@ -849,8 +849,24 @@ final class CameraViewModel: ObservableObject {
                     let player = mediaImporter.createPlayer(for: url)
                     importedPlayer = player
                     importedImage = mediaImporter.thumbnailImage
-                    // 预加载第一帧以便预览
-                    await player.seek(to: .zero)
+
+                    // 导入后立即循环播放预览（非录制状态下循环）
+                    player.actionAtItemEnd = .none
+                    NotificationCenter.default.addObserver(
+                        forName: .AVPlayerItemDidPlayToEndTime,
+                        object: player.currentItem,
+                        queue: .main
+                    ) { [weak self, weak player] _ in
+                        guard let self else { return }
+                        if self.isRecording {
+                            // 录制中由 onVideoDidEnd 处理自动停止
+                            return
+                        }
+                        // 非录制时循环播放
+                        player?.seek(to: .zero)
+                        player?.play()
+                    }
+                    player.play()
 
                     // 设置视频输出（强制 SDR 避免 HDR 户外视频过曝）
                     let output = AVPlayerItemVideoOutput(outputSettings: [

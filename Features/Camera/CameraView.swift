@@ -403,8 +403,11 @@ struct CameraPreviewPanel: View {
             if let importedVideoBuffer {
                 // 录制中：显示实时视频帧
                 SampleBufferDisplayView(sampleBuffer: importedVideoBuffer)
+            } else if let importedPlayer {
+                // 非录制：显示 AVPlayer 循环预览
+                VideoPlayerView(player: importedPlayer)
             } else if let importedImage {
-                // 非录制：显示缩略图（避免 AVPlayerLayer 未播放时黑屏）
+                // 图片合拍：显示导入的图片
                 Image(uiImage: importedImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
