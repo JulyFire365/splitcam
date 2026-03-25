@@ -404,17 +404,8 @@ struct CameraPreviewPanel: View {
                 // 录制中：显示实时视频帧
                 SampleBufferDisplayView(sampleBuffer: importedVideoBuffer)
             } else if importedPlayer != nil || importedImage != nil {
-                // 合拍预览：缩略图垫底 + 视频播放叠加（避免加载期间黑屏）
-                ZStack {
-                    if let importedImage {
-                        Image(uiImage: importedImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    }
-                    if let importedPlayer {
-                        VideoPlayerView(player: importedPlayer)
-                    }
-                }
+                // 合拍预览：纯 UIKit 统一处理（缩略图垫底 + 播放器叠加）
+                DuetPreviewView(player: importedPlayer, thumbnail: importedImage)
             } else if let buffer = sampleBuffer {
                 SampleBufferDisplayView(sampleBuffer: buffer)
             } else {

@@ -2,7 +2,81 @@ import SwiftUI
 import AVFoundation
 import AVKit
 
-/// AVPlayer 的 SwiftUI 包装视图
+// MARK: - 合拍预览视图（缩略图 + 播放器 全部在 UIKit 层处理）
+
+struct DuetPreviewView: UIViewRepresentable {
+    let player: AVPlayer?
+    let thumbnail: UIImage?
+
+    func makeUIView(context: Context) -> DuetPreviewUIView {
+        DuetPreviewUIView()
+    }
+
+    func updateUIView(_ uiView: DuetPreviewUIView, context: Context) {
+        uiView.update(player: player, thumbnail: thumbnail)
+    }
+}
+
+class DuetPreviewUIView: UIView {
+    private let thumbnailView = UIImageView()
+    private let playerLayer = AVPlayerLayer()
+    private var statusObserver: NSKeyValueObservation?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .black
+        clipsToBounds = true
+
+        // 缩略图层 — 立刻可见
+        thumbnailView.contentMode = .scaleAspectFill
+        thumbnailView.clipsToBounds = true
+        addSubview(thumbnailView)
+
+        // 播放器层 — 视频加载后覆盖缩略图
+        playerLayer.videoGravity = .resizeAspectFill
+        layer.addSublayer(playerLayer)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(player: AVPlayer?, thumbnail: UIImage?) {
+        thumbnailView.image = thumbnail
+
+        guard playerLayer.player !== player else { return }
+        playerLayer.player = player
+
+        // 移除旧观察者
+        statusObserver?.invalidate()
+        statusObserver = nil
+
+        // 监听 readyToPlay，自动播放
+        if let item = player?.currentItem {
+            statusObserver = item.observe(\.status, options: [.new]) { [weak player] item, _ in
+                if item.status == .readyToPlay, player?.rate == 0 {
+                    player?.play()
+                }
+            }
+        }
+    }
+
+    deinit {
+        statusObserver?.invalidate()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        thumbnailView.frame = bounds
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        playerLayer.frame = bounds
+        CATransaction.commit()
+    }
+}
+
+// MARK: - 普通视频播放视图（非合拍场景）
+
 struct VideoPlayerView: UIViewRepresentable {
     let player: AVPlayer
 
@@ -19,38 +93,20 @@ struct VideoPlayerView: UIViewRepresentable {
 
 class PlayerUIView: UIView {
     let playerLayer = AVPlayerLayer()
-    private var statusObserver: NSKeyValueObservation?
 
     init(player: AVPlayer) {
         super.init(frame: .zero)
         playerLayer.player = player
         playerLayer.videoGravity = .resizeAspectFill
         layer.addSublayer(playerLayer)
-
-        // 监听 player item 状态，就绪后确保显示首帧
-        statusObserver = player.currentItem?.observe(\.status, options: [.new]) { [weak player] item, _ in
-            if item.status == .readyToPlay {
-                // 如果 player 还没有播放，至少显示第一帧
-                if player?.rate == 0 {
-                    player?.play()
-                }
-            }
-        }
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
-        statusObserver?.invalidate()
-    }
-
     override func layoutSubviews() {
         super.layoutSubviews()
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
         playerLayer.frame = bounds
-        CATransaction.commit()
     }
 }
