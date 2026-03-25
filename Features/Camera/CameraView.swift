@@ -403,9 +403,18 @@ struct CameraPreviewPanel: View {
             if let importedVideoBuffer {
                 // 录制中：显示实时视频帧
                 SampleBufferDisplayView(sampleBuffer: importedVideoBuffer)
-            } else if importedPlayer != nil || importedImage != nil {
-                // 合拍预览：纯 UIKit 统一处理（缩略图垫底 + 播放器叠加）
-                DuetPreviewView(player: importedPlayer, thumbnail: importedImage)
+            } else if let importedImage {
+                // 合拍预览：纯 SwiftUI 显示缩略图
+                Image(uiImage: importedImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else if importedPlayer != nil {
+                // 缩略图未就绪时的兜底（不应该到这里）
+                Color.gray.opacity(0.3)
+                    .overlay(
+                        ProgressView()
+                            .tint(.white)
+                    )
             } else if let buffer = sampleBuffer {
                 SampleBufferDisplayView(sampleBuffer: buffer)
             } else {
