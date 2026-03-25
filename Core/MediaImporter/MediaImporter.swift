@@ -67,12 +67,13 @@ final class MediaImporter: ObservableObject, @unchecked Sendable {
         self.player = player
 
         // 监听视频播放结束
+        nonisolated(unsafe) let weakSelf = { [weak self] in self }
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem,
             queue: .main
-        ) { [weak self] _ in
-            self?.onVideoDidEnd?()
+        ) { _ in
+            weakSelf()?.onVideoDidEnd?()
         }
 
         await MainActor.run {

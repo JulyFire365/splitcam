@@ -582,13 +582,15 @@ final class CameraViewModel: ObservableObject {
         recordingDuration = 0
 
         // 录制计时器
-        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
-            guard let self else { timer.invalidate(); return }
-            if !self.isRecording {
-                timer.invalidate()
-                return
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+            Task { @MainActor [weak self] in
+                guard let self else { timer.invalidate(); return }
+                if !self.isRecording {
+                    timer.invalidate()
+                    return
+                }
+                self.recordingDuration += 1
             }
-            self.recordingDuration += 1
         }
 
         if isDuetMode && importedPlayer != nil {
@@ -801,11 +803,12 @@ final class CameraViewModel: ObservableObject {
         composedAudioInput?.markAsFinished()
 
         guard let writer = composedWriter, let outputURL = composedOutputURL else { return }
+        nonisolated(unsafe) let writerRef = writer
 
-        writer.finishWriting { [weak self] in
+        writerRef.finishWriting { [weak self] in
             guard let self else { return }
             DispatchQueue.main.async {
-                if writer.status == .completed {
+                if writerRef.status == .completed {
                     // 生成缩略图
                     Task {
                         let asset = AVURLAsset(url: outputURL)
@@ -847,7 +850,7 @@ final class CameraViewModel: ObservableObject {
                     importedPlayer = player
                     importedImage = mediaImporter.thumbnailImage
                     // 预加载第一帧以便预览
-                    player.seek(to: .zero)
+                    await player.seek(to: .zero)
 
                     // 设置视频输出（强制 SDR 避免 HDR 户外视频过曝）
                     let output = AVPlayerItemVideoOutput(outputSettings: [
