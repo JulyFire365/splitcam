@@ -894,9 +894,16 @@ final class CameraViewModel: ObservableObject {
 
                     // 加载视频方向
                     let asset = AVURLAsset(url: url)
-                    if let track = try? await asset.loadTracks(withMediaType: .video).first,
-                       let transform = try? await track.load(.preferredTransform) {
-                        importedVideoOrientation = Self.orientationFromTransform(transform)
+                    if let track = try? await asset.loadTracks(withMediaType: .video).first {
+                        let transform = try? await track.load(.preferredTransform)
+                        let naturalSize = try? await track.load(.naturalSize)
+                        if let t = transform {
+                            importedVideoOrientation = Self.orientationFromTransform(t)
+                            let angle = atan2(t.b, t.a) * 180 / .pi
+                            debugText = "方向: \(importedVideoOrientation.rawValue) 角度: \(Int(angle))° 尺寸: \(naturalSize ?? .zero)"
+                        } else {
+                            importedVideoOrientation = .up
+                        }
                     } else {
                         importedVideoOrientation = .up
                     }
@@ -940,15 +947,19 @@ final class CameraViewModel: ObservableObject {
     // MARK: - Orientation Helper
 
     /// 从 AVAssetTrack 的 preferredTransform 推导 CGImagePropertyOrientation
+    /// 使用 atan2 角度检测，避免浮点精度问题
     private static func orientationFromTransform(_ t: CGAffineTransform) -> CGImagePropertyOrientation {
-        if t.a == 0 && t.b == 1 && t.c == -1 && t.d == 0 {
-            return .right      // 90° CW（竖拍）
-        } else if t.a == 0 && t.b == -1 && t.c == 1 && t.d == 0 {
+        let angle = atan2(t.b, t.a) // 弧度
+        let degrees = angle * 180.0 / .pi
+
+        if abs(degrees - 90) < 10 {
+            return .right      // 90° CW（iPhone 竖拍）
+        } else if abs(degrees + 90) < 10 || abs(degrees - 270) < 10 {
             return .left       // 270° CW
-        } else if t.a == -1 && t.b == 0 && t.c == 0 && t.d == -1 {
+        } else if abs(abs(degrees) - 180) < 10 {
             return .down       // 180°
         }
-        return .up             // 0°（横拍）
+        return .up             // 0°（横拍/无旋转）
     }
 }
 
