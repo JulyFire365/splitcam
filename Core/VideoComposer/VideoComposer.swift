@@ -45,14 +45,12 @@ class SplitScreenInstruction: NSObject, AVVideoCompositionInstructionProtocol {
 }
 
 /// 自定义视频合成器 — 使用 CIImage 逐帧渲染分屏画面（含裁切）
-class SplitScreenCompositor: NSObject, @preconcurrency AVVideoCompositing, @unchecked Sendable {
-    nonisolated var sourcePixelBufferAttributes: [String: Any]? {
+class SplitScreenCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
+    nonisolated(unsafe) var sourcePixelBufferAttributes: [String: Any]? =
         [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)]
-    }
 
-    nonisolated var requiredPixelBufferAttributesForRenderContext: [String: Any] {
+    nonisolated(unsafe) var requiredPixelBufferAttributesForRenderContext: [String: Any] =
         [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)]
-    }
 
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 

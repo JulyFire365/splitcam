@@ -34,10 +34,6 @@ class DuetPreviewUIView: UIView {
         // 播放器层 — 视频加载后覆盖缩略图
         playerLayer.videoGravity = .resizeAspectFill
         playerLayer.backgroundColor = UIColor.clear.cgColor
-        // 强制 HDR → SDR 色调映射，防止户外视频预览过曝
-        if #available(iOS 17.2, *) {
-            playerLayer.toneMapToStandardDynamicRange = true
-        }
         layer.addSublayer(playerLayer)
     }
 

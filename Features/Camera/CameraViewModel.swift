@@ -842,6 +842,19 @@ final class CameraViewModel: ObservableObject {
                     importedImage = thumb
                     importedPlayer = player
 
+                    // 强制 HDR→SDR：通过 videoComposition 设置 BT.709 色彩空间
+                    if let item = player.currentItem {
+                        let asset = AVURLAsset(url: url)
+                        let comp = try? await AVMutableVideoComposition.videoComposition(
+                            withPropertiesOf: asset)
+                        if let comp {
+                            comp.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
+                            comp.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
+                            comp.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
+                            item.videoComposition = comp
+                        }
+                    }
+
                     // 设置视频输出（强制 SDR 避免 HDR 户外视频过曝）
                     let output = AVPlayerItemVideoOutput(outputSettings: [
                         kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
