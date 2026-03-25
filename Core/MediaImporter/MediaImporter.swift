@@ -10,7 +10,7 @@ enum ImportedContent {
 }
 
 /// 媒体导入模块 — 从相册选择视频或图片用于合拍
-final class MediaImporter: ObservableObject {
+final class MediaImporter: ObservableObject, @unchecked Sendable {
     @Published var importedContent: ImportedContent?
     @Published var isImporting = false
     @Published var error: ImporterError?

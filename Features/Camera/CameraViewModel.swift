@@ -903,7 +903,6 @@ final class CameraViewModel: ObservableObject {
         recIsDuetMode = false
         syncRecordingSnapshot()
     }
-}
 
     // MARK: - Orientation Helper
 
