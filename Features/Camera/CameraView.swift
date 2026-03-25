@@ -42,6 +42,21 @@ struct CameraView: View {
                            value: viewModel.camerasReady)
                 .allowsHitTesting(false)
 
+            // 调试信息（临时）
+            if !viewModel.debugText.isEmpty {
+                VStack {
+                    Text(viewModel.debugText)
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(.yellow)
+                        .padding(8)
+                        .background(Color.black.opacity(0.7))
+                        .cornerRadius(8)
+                    Spacer()
+                }
+                .padding(.top, 60)
+                .allowsHitTesting(false)
+            }
+
             // 闪光效果 (拍照)
             if viewModel.showFlashEffect {
                 Color.white

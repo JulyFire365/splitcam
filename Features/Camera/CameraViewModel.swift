@@ -47,6 +47,7 @@ final class CameraViewModel: ObservableObject {
     private var captureMode: CaptureMode = .dualCamera
     @Published var importedPlayer: AVPlayer?
     @Published var importedImage: UIImage?
+    @Published var debugText: String = ""
 
     @Published var importedVideoBuffer: CMSampleBuffer?
 
@@ -842,14 +843,18 @@ final class CameraViewModel: ObservableObject {
     }
 
     func handlePickedMedia(_ result: PHPickerResult) {
+        debugText = "① 开始导入..."
         Task {
             do {
                 if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                    debugText = "② 正在加载视频..."
                     let url = try await mediaImporter.importVideo(from: result)
+                    debugText = "③ 视频加载完成，生成缩略图..."
                     let player = mediaImporter.createPlayer(for: url)
-                    importedImage = mediaImporter.thumbnailImage
+                    let thumb = mediaImporter.thumbnailImage
+                    debugText = "④ thumb=\(thumb != nil) size=\(thumb?.size ?? .zero)"
+                    importedImage = thumb
                     importedPlayer = player
-                    print("[SplitCam] 导入完成: thumbnail=\(importedImage != nil), player=\(importedPlayer != nil)")
 
                     // 设置视频输出（强制 SDR 避免 HDR 户外视频过曝）
                     let output = AVPlayerItemVideoOutput(outputSettings: [
@@ -889,6 +894,7 @@ final class CameraViewModel: ObservableObject {
                 }
                 syncRecordingSnapshot()
             } catch {
+                debugText = "❌ 导入失败: \(error.localizedDescription)"
                 errorMessage = error.localizedDescription
                 showError = true
             }
