@@ -42,20 +42,6 @@ struct CameraView: View {
                            value: viewModel.camerasReady)
                 .allowsHitTesting(false)
 
-            // 调试信息（临时）
-            if !viewModel.debugText.isEmpty {
-                VStack {
-                    Text(viewModel.debugText)
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(.yellow)
-                        .padding(8)
-                        .background(Color.black.opacity(0.7))
-                        .cornerRadius(8)
-                    Spacer()
-                }
-                .padding(.top, 60)
-                .allowsHitTesting(false)
-            }
 
             // 闪光效果 (拍照)
             if viewModel.showFlashEffect {
@@ -151,16 +137,12 @@ struct CameraView: View {
             SplitPreviewView(layout: viewModel.layoutEngine, isDraggingBinding: $viewModel.isDraggingDivider) {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.frontFrameBuffer : viewModel.backFrameBuffer,
-                    importedImage: viewModel.panelsSwapped ? nil : viewModel.importedImage,
-                    importedVideoBuffer: viewModel.panelsSwapped ? nil : viewModel.importedVideoBuffer,
-                    importedPlayer: viewModel.panelsSwapped ? nil : viewModel.importedPlayer
+                    importedImage: viewModel.panelsSwapped ? nil : viewModel.importedImage
                 )
             } secondContent: {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.backFrameBuffer : viewModel.frontFrameBuffer,
-                    importedImage: viewModel.panelsSwapped ? viewModel.importedImage : nil,
-                    importedVideoBuffer: viewModel.panelsSwapped ? viewModel.importedVideoBuffer : nil,
-                    importedPlayer: viewModel.panelsSwapped ? viewModel.importedPlayer : nil
+                    importedImage: viewModel.panelsSwapped ? viewModel.importedImage : nil
                 )
             }
             .frame(width: previewSize.width, height: previewSize.height)
@@ -408,29 +390,18 @@ struct CameraView: View {
 struct CameraPreviewPanel: View {
     let sampleBuffer: CMSampleBuffer?
     var importedImage: UIImage?
-    var importedVideoBuffer: CMSampleBuffer?
-    var importedPlayer: AVPlayer?
 
     var body: some View {
         ZStack {
             Color.black
 
-            if let importedVideoBuffer {
-                // 录制中：显示实时视频帧
-                SampleBufferDisplayView(sampleBuffer: importedVideoBuffer)
-                    .overlay(Text("REC").foregroundColor(.red).font(.caption).padding(4), alignment: .topLeading)
-            } else if let importedImage {
-                // 合拍预览：纯 SwiftUI 显示缩略图
+            if let importedImage {
+                // 合拍模式：始终显示缩略图（录制合成在后台进行）
                 Image(uiImage: importedImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .overlay(Text("IMG").foregroundColor(.green).font(.caption).padding(4), alignment: .topLeading)
-            } else if importedPlayer != nil {
-                Color.gray.opacity(0.3)
-                    .overlay(Text("PLAYER").foregroundColor(.yellow).font(.caption).padding(4), alignment: .topLeading)
             } else if let buffer = sampleBuffer {
                 SampleBufferDisplayView(sampleBuffer: buffer)
-                    .overlay(Text("CAM").foregroundColor(.cyan).font(.caption).padding(4), alignment: .topLeading)
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "camera.fill")

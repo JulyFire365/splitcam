@@ -164,12 +164,11 @@ final class CameraViewModel: ObservableObject {
             guard let self else { return }
             self.latestBackPixelBuffer = CMSampleBufferGetImageBuffer(buffer)
 
-            // 合拍模式 + 录制中：抓取导入视频帧（用于合成 + 预览）
+            // 合拍模式 + 录制中：抓取导入视频帧（仅用于后台合成，预览显示缩略图）
             if self.recIsDuetMode, self.composedWriter != nil,
                let vo = self.importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    // 强制 sRGB 色彩空间（防止 HDR/HLG 过曝）+ 修正视频方向
                     var ci = CIImage(cvPixelBuffer: pb, options: [
                         .colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
                     ])
@@ -178,20 +177,6 @@ final class CameraViewModel: ObservableObject {
                         ci = ci.oriented(orientation)
                     }
                     self.latestImportedCIImage = ci
-
-                    // 渲染正确方向的预览帧
-                    let w = Int(ci.extent.width), h = Int(ci.extent.height)
-                    var previewPB: CVPixelBuffer?
-                    CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_32BGRA, nil, &previewPB)
-                    if let ppb = previewPB {
-                        self.recordingCIContext.render(ci, to: ppb)
-                        let pts = CMSampleBufferGetPresentationTimeStamp(buffer)
-                        if let sb = self.createSampleBufferFromPixelBuffer(ppb, timestamp: pts) {
-                            DispatchQueue.main.async {
-                                self.importedVideoBuffer = sb
-                            }
-                        }
-                    }
                 }
             }
 
