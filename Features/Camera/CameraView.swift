@@ -81,6 +81,8 @@ struct CameraView: View {
 
     private var fullScreenPreview: some View {
         GeometryReader { geo in
+            let previewSize = calculatePreviewSize(in: geo.size)
+
             SplitPreviewView(layout: viewModel.layoutEngine, isDraggingBinding: $viewModel.isDraggingDivider) {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.frontFrameBuffer : viewModel.backFrameBuffer,
@@ -94,7 +96,20 @@ struct CameraView: View {
                     importedPlayer: viewModel.panelsSwapped ? viewModel.importedPlayer : nil
                 )
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+            .frame(width: previewSize.width, height: previewSize.height)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+        }
+    }
+
+    private func calculatePreviewSize(in containerSize: CGSize) -> CGSize {
+        let ratio = viewModel.aspectRatio.aspectRatio
+        let containerRatio = containerSize.width / containerSize.height
+
+        if ratio > containerRatio {
+            return CGSize(width: containerSize.width, height: containerSize.width / ratio)
+        } else {
+            return CGSize(width: containerSize.height * ratio, height: containerSize.height)
         }
     }
 

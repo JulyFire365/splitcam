@@ -10,6 +10,8 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
     @State private var isDragging = false
     @State private var pipDragStartOffset: CGSize = .zero
     @State private var pipScaleStart: CGFloat = 0.3
+    /// 是否已交互过（拖拽/缩放），用于隐藏引导提示
+    @State private var hasInteracted = false
 
     init(layout: SplitLayoutEngine,
          isDraggingBinding: Binding<Bool> = .constant(false),
@@ -28,6 +30,10 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
             } else {
                 splitLayout(in: geo.size)
             }
+        }
+        // 切换分屏模式时重置引导提示
+        .onChange(of: layout.splitMode) { _ in
+            hasInteracted = false
         }
     }
 
@@ -74,55 +80,77 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
         let isCircle = layout.pipShape == .circle
         let size = isCircle ? min(pipFrame.width, pipFrame.height) : 0
 
-        return secondContent()
-            .frame(width: isCircle ? size : pipFrame.width,
-                   height: isCircle ? size : pipFrame.height)
-            .clipShape(pipClipShapeValue)
-            .overlay(pipBorderOverlayView)
-            .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
-            .position(x: pipFrame.midX, y: pipFrame.midY)
-            // 拖拽移动
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        if !isDragging {
-                            isDragging = true
-                            isDraggingBinding = true
-                            pipDragStartOffset = layout.pipOffset
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        }
-                        layout.pipOffset = CGSize(
-                            width: pipDragStartOffset.width + value.translation.width,
-                            height: pipDragStartOffset.height + value.translation.height
-                        )
-                    }
-                    .onEnded { _ in
-                        isDragging = false
-                        isDraggingBinding = false
-                    }
-            )
-            // 双指缩放
-            .simultaneousGesture(
-                MagnificationGesture()
-                    .onChanged { scale in
-                        if pipScaleStart == 0 {
-                            pipScaleStart = layout.pipScale
-                        }
-                        let newScale = pipScaleStart * scale
-                        layout.pipScale = min(SplitLayoutEngine.pipMaxScale,
-                                              max(SplitLayoutEngine.pipMinScale, newScale))
-                    }
-                    .onEnded { _ in
-                        pipScaleStart = 0
-                    }
-            )
-            // 点击切换小窗口形状（圆形/矩形）
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    layout.pipShape = layout.pipShape == .roundedRect ? .circle : .roundedRect
-                }
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        return ZStack {
+            secondContent()
+                .frame(width: isCircle ? size : pipFrame.width,
+                       height: isCircle ? size : pipFrame.height)
+                .clipShape(pipClipShapeValue)
+                .overlay(pipBorderOverlayView)
+                .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
+
+            // 缩放引导提示
+            if !hasInteracted {
+                PipScaleHint()
+                    .frame(width: isCircle ? size : pipFrame.width,
+                           height: isCircle ? size : pipFrame.height)
+                    .clipShape(pipClipShapeValue)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
             }
+        }
+        .position(x: pipFrame.midX, y: pipFrame.midY)
+        // 拖拽移动
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    if !isDragging {
+                        isDragging = true
+                        isDraggingBinding = true
+                        pipDragStartOffset = layout.pipOffset
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }
+                    layout.pipOffset = CGSize(
+                        width: pipDragStartOffset.width + value.translation.width,
+                        height: pipDragStartOffset.height + value.translation.height
+                    )
+                    dismissHint()
+                }
+                .onEnded { _ in
+                    isDragging = false
+                    isDraggingBinding = false
+                }
+        )
+        // 双指缩放
+        .simultaneousGesture(
+            MagnificationGesture()
+                .onChanged { scale in
+                    if pipScaleStart == 0 {
+                        pipScaleStart = layout.pipScale
+                    }
+                    let newScale = pipScaleStart * scale
+                    layout.pipScale = min(SplitLayoutEngine.pipMaxScale,
+                                          max(SplitLayoutEngine.pipMinScale, newScale))
+                    dismissHint()
+                }
+                .onEnded { _ in
+                    pipScaleStart = 0
+                }
+        )
+        // 点击切换小窗口形状（圆形/矩形）
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                layout.pipShape = layout.pipShape == .roundedRect ? .circle : .roundedRect
+            }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            dismissHint()
+        }
+    }
+
+    private func dismissHint() {
+        guard !hasInteracted else { return }
+        withAnimation(.easeOut(duration: 0.3)) {
+            hasInteracted = true
+        }
     }
 
     private var pipClipShapeValue: AnyShape {
@@ -151,14 +179,32 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
         dividerLine(in: containerSize)
         dragHitArea(in: containerSize)
         dragHandle(in: containerSize)
+
+        // 引导箭头提示
+        if !hasInteracted {
+            DividerArrowHint(isHorizontal: layout.splitMode == .leftRight)
+                .position(
+                    x: layout.splitMode == .leftRight
+                        ? containerSize.width * layout.splitRatio
+                        : containerSize.width / 2,
+                    y: layout.splitMode == .topBottom
+                        ? containerSize.height * layout.splitRatio
+                        : containerSize.height / 2
+                )
+                .allowsHitTesting(false)
+                .transition(.opacity)
+        }
     }
 
     private func dividerLine(in containerSize: CGSize) -> some View {
-        Rectangle()
-            .fill(layout.borderStyle.style == .none ? Color.white.opacity(0.3) : layout.borderStyle.color)
+        // 细线分隔 — 使用半透明白色 + 模糊效果模拟毛玻璃
+        let lineThickness: CGFloat = 1.5
+
+        return Rectangle()
+            .fill(.white.opacity(0.5))
             .frame(
-                width: layout.splitMode == .leftRight ? max(layout.borderStyle.width, 1) : containerSize.width,
-                height: layout.splitMode == .topBottom ? max(layout.borderStyle.width, 1) : containerSize.height
+                width: layout.splitMode == .leftRight ? lineThickness : containerSize.width,
+                height: layout.splitMode == .topBottom ? lineThickness : containerSize.height
             )
             .position(
                 x: layout.splitMode == .leftRight
@@ -210,6 +256,8 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                         case .pip:
                             break
                         }
+
+                        dismissHint()
                     }
                     .onEnded { _ in
                         isDragging = false
@@ -220,19 +268,17 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
     }
 
     private func dragHandle(in containerSize: CGSize) -> some View {
-        let handleSize: CGFloat = isDragging ? 36 : 28
+        let handleWidth: CGFloat = isDragging ? 6 : 4
+        let handleLength: CGFloat = isDragging ? 44 : 36
+        let isH = layout.splitMode == .leftRight
 
-        return Circle()
+        return Capsule()
             .fill(.white.opacity(isDragging ? 0.95 : 0.7))
-            .frame(width: handleSize, height: handleSize)
-            .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 2)
-            .overlay(
-                Image(systemName: layout.splitMode == .leftRight
-                      ? "arrow.left.and.right"
-                      : "arrow.up.and.down")
-                    .font(.system(size: isDragging ? 14 : 11, weight: .bold))
-                    .foregroundColor(.gray)
+            .frame(
+                width: isH ? handleWidth : handleLength,
+                height: isH ? handleLength : handleWidth
             )
+            .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 1)
             .position(
                 x: layout.splitMode == .leftRight
                     ? containerSize.width * layout.splitRatio
@@ -243,5 +289,69 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
             )
             .animation(.easeInOut(duration: 0.15), value: isDragging)
             .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Divider Arrow Hint (分隔条引导箭头)
+
+/// 分隔条两侧缓慢闪动的箭头提示
+struct DividerArrowHint: View {
+    let isHorizontal: Bool // true = 左右分屏, false = 上下分屏
+    @State private var animating = false
+
+    var body: some View {
+        Group {
+            if isHorizontal {
+                HStack(spacing: 28) {
+                    Image(systemName: "chevron.left")
+                        .offset(x: animating ? -4 : 0)
+                    Image(systemName: "chevron.right")
+                        .offset(x: animating ? 4 : 0)
+                }
+            } else {
+                VStack(spacing: 28) {
+                    Image(systemName: "chevron.up")
+                        .offset(y: animating ? -4 : 0)
+                    Image(systemName: "chevron.down")
+                        .offset(y: animating ? 4 : 0)
+                }
+            }
+        }
+        .font(.system(size: 14, weight: .bold))
+        .foregroundColor(.white.opacity(0.8))
+        .animation(
+            .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
+            value: animating
+        )
+        .onAppear { animating = true }
+    }
+}
+
+// MARK: - PiP Scale Hint (画中画缩放引导)
+
+/// 画中画小窗口上的缩放提示（双指箭头图标）
+struct PipScaleHint: View {
+    @State private var animating = false
+
+    var body: some View {
+        ZStack {
+            // 半透明背景
+            Color.black.opacity(0.3)
+
+            VStack(spacing: 6) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 22, weight: .semibold))
+                    .scaleEffect(animating ? 1.15 : 0.9)
+
+                Text("捏合缩放")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundColor(.white.opacity(0.9))
+            .animation(
+                .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
+                value: animating
+            )
+            .onAppear { animating = true }
+        }
     }
 }
