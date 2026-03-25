@@ -164,8 +164,9 @@ final class CameraViewModel: ObservableObject {
             guard let self else { return }
             self.latestBackPixelBuffer = CMSampleBufferGetImageBuffer(buffer)
 
-            // 合拍模式：抓取导入视频帧（用于合成 + 预览）
-            if self.recIsDuetMode, let vo = self.importedVideoOutput {
+            // 合拍模式 + 录制中：抓取导入视频帧（用于合成 + 预览）
+            if self.recIsDuetMode, self.composedWriter != nil,
+               let vo = self.importedVideoOutput {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
                     // 强制 sRGB 色彩空间（防止 HDR/HLG 过曝）+ 修正视频方向
