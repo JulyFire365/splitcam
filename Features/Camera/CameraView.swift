@@ -137,12 +137,14 @@ struct CameraView: View {
             SplitPreviewView(layout: viewModel.layoutEngine, isDraggingBinding: $viewModel.isDraggingDivider) {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.frontFrameBuffer : viewModel.backFrameBuffer,
-                    importedImage: viewModel.panelsSwapped ? nil : viewModel.importedImage
+                    importedImage: viewModel.panelsSwapped ? nil : viewModel.importedImage,
+                    importedPlayer: viewModel.panelsSwapped ? nil : viewModel.importedPlayer
                 )
             } secondContent: {
                 CameraPreviewPanel(
                     sampleBuffer: viewModel.panelsSwapped ? viewModel.backFrameBuffer : viewModel.frontFrameBuffer,
-                    importedImage: viewModel.panelsSwapped ? viewModel.importedImage : nil
+                    importedImage: viewModel.panelsSwapped ? viewModel.importedImage : nil,
+                    importedPlayer: viewModel.panelsSwapped ? viewModel.importedPlayer : nil
                 )
             }
             .frame(width: previewSize.width, height: previewSize.height)
@@ -390,16 +392,16 @@ struct CameraView: View {
 struct CameraPreviewPanel: View {
     let sampleBuffer: CMSampleBuffer?
     var importedImage: UIImage?
+    var importedPlayer: AVPlayer?
 
     var body: some View {
         ZStack {
             Color.black
 
-            if let importedImage {
-                // 合拍模式：始终显示缩略图（录制合成在后台进行）
-                Image(uiImage: importedImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+            if importedImage != nil || importedPlayer != nil {
+                // 合拍模式：缩略图垫底 + AVPlayerLayer 叠加
+                // 未播放时显示缩略图，播放时视频自动覆盖
+                DuetPreviewView(player: importedPlayer, thumbnail: importedImage)
             } else if let buffer = sampleBuffer {
                 SampleBufferDisplayView(sampleBuffer: buffer)
             } else {

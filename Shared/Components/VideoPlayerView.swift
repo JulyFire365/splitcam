@@ -20,7 +20,6 @@ struct DuetPreviewView: UIViewRepresentable {
 class DuetPreviewUIView: UIView {
     private let thumbnailView = UIImageView()
     private let playerLayer = AVPlayerLayer()
-    private var statusObserver: NSKeyValueObservation?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -46,23 +45,8 @@ class DuetPreviewUIView: UIView {
 
         guard playerLayer.player !== player else { return }
         playerLayer.player = player
-
-        // 移除旧观察者
-        statusObserver?.invalidate()
-        statusObserver = nil
-
-        // 监听 readyToPlay，自动播放
-        if let item = player?.currentItem {
-            statusObserver = item.observe(\.status, options: [.new]) { [weak player] item, _ in
-                if item.status == .readyToPlay, player?.rate == 0 {
-                    player?.play()
-                }
-            }
-        }
-    }
-
-    deinit {
-        statusObserver?.invalidate()
+        // 播放器层透明背景，未播放时缩略图可见
+        playerLayer.backgroundColor = UIColor.clear.cgColor
     }
 
     override func layoutSubviews() {
