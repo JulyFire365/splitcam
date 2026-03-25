@@ -28,16 +28,7 @@ struct CameraView: View {
             }
             .ignoresSafeArea(.container, edges: .bottom)
 
-            // ③ 合拍模式指示条
-            if viewModel.isDuetMode {
-                VStack {
-                    duetModeBar
-                        .padding(.top, 60)
-                    Spacer()
-                }
-            }
-
-            // ④ 摄像头未就绪时的黑色蒙版
+            // ③ 摄像头未就绪时的黑色蒙版
             Color.black
                 .ignoresSafeArea()
                 .opacity(viewModel.camerasReady ? 0 : 1)
@@ -162,12 +153,22 @@ struct CameraView: View {
                 .ignoresSafeArea()
             )
 
-            // 比例选择器（录制时隐藏）
-            if !viewModel.isRecording {
-                aspectRatioBar
-                    .padding(.top, 4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+            // 比例选择器 + 合拍标签（录制时隐藏比例）
+            HStack(spacing: 8) {
+                if !viewModel.isRecording {
+                    aspectRatioBar
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                Spacer()
+
+                if viewModel.isDuetMode {
+                    duetModeBadge
+                        .transition(.opacity.combined(with: .scale))
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
         }
     }
 
@@ -408,30 +409,27 @@ struct CameraView: View {
         }
     }
 
-    // MARK: - Duet Mode Bar
+    // MARK: - Duet Mode Badge (紧凑胶囊)
 
-    private var duetModeBar: some View {
-        HStack(spacing: 6) {
+    private var duetModeBadge: some View {
+        HStack(spacing: 5) {
             Image(systemName: "person.2.fill")
-                .font(.system(size: 12))
-            Text("合拍模式")
-                .font(.system(size: 13, weight: .medium))
-            Spacer()
+                .font(.system(size: 10))
+            Text("合拍")
+                .font(.system(size: 12, weight: .medium))
+
             if !viewModel.isRecording {
                 Button(action: { viewModel.exitDuetMode() }) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.7))
                 }
             }
         }
         .foregroundColor(.white)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial.opacity(0.8))
-        .environment(\.colorScheme, .dark)
-        .clipShape(Capsule())
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(.ultraThinMaterial).environment(\.colorScheme, .dark))
     }
 
     // MARK: - Processing Overlay
