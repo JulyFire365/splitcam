@@ -570,7 +570,6 @@ final class CameraViewModel: ObservableObject {
                 AVVideoCompressionPropertiesKey: [
                     AVVideoAverageBitRateKey: videoBitRate,
                     AVVideoExpectedSourceFrameRateKey: 30,
-                    AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main_AutoLevel,
                     AVVideoQualityKey: 0.95  // 高质量编码
                 ] as [String: Any]
             ]
