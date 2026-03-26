@@ -181,7 +181,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             // 后摄拍照
             if let backOutput = self.backPhotoOutput {
                 let settings = AVCapturePhotoSettings()
-                settings.isHighResolutionPhotoEnabled = true
+                settings.maxPhotoDimensions = backOutput.maxPhotoDimensions
                 if backOutput.availablePhotoCodecTypes.contains(.hevc) {
                     settings.photoQualityPrioritization = .quality
                 }
@@ -191,7 +191,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             // 前摄拍照
             if let frontOutput = self.frontPhotoOutput {
                 let settings = AVCapturePhotoSettings()
-                settings.isHighResolutionPhotoEnabled = true
+                settings.maxPhotoDimensions = frontOutput.maxPhotoDimensions
                 if frontOutput.availablePhotoCodecTypes.contains(.hevc) {
                     settings.photoQualityPrioritization = .quality
                 }
@@ -327,7 +327,6 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
                 // 后摄 Photo Output（ISP 管线拍照）
                 let backPhoto = AVCapturePhotoOutput()
-                backPhoto.isHighResolutionCaptureEnabled = true
                 backPhoto.maxPhotoQualityPrioritization = .quality
                 if multiCamSession.canAddOutput(backPhoto) {
                     multiCamSession.addOutputWithNoConnections(backPhoto)
@@ -379,7 +378,6 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
                 // 前摄 Photo Output（ISP 管线拍照）
                 let frontPhoto = AVCapturePhotoOutput()
-                frontPhoto.isHighResolutionCaptureEnabled = true
                 frontPhoto.maxPhotoQualityPrioritization = .quality
                 if multiCamSession.canAddOutput(frontPhoto) {
                     multiCamSession.addOutputWithNoConnections(frontPhoto)

@@ -65,8 +65,8 @@
 		B10025 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		B10026 /* SplitCamProducts.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = SplitCamProducts.storekit; sourceTree = "<group>"; };
 		B10027 /* String+L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+L10n.swift"; sourceTree = "<group>"; };
-		V10002 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
-		V10003 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = "Resources/en.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		V10002 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		V10003 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = "en.lproj/Localizable.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
