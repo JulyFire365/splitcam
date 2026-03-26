@@ -113,7 +113,15 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
     func setupSession(resolution: CaptureResolution = .hd1080p) {
         sessionQueue.async { [weak self] in
-            self?.configureSession(resolution: resolution)
+            guard let self else { return }
+            self.configureSession(resolution: resolution)
+            // 配置完直接启动，避免二次排队延迟
+            if !self.multiCamSession.isRunning {
+                self.multiCamSession.startRunning()
+            }
+            DispatchQueue.main.async {
+                self.isRunning = true
+            }
         }
     }
 

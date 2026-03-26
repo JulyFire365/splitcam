@@ -242,8 +242,8 @@ final class CameraViewModel: ObservableObject {
                 showError = true
                 return
             }
+            // setupSession 内部配置完后会自动 startRunning，减少一次队列调度延迟
             cameraEngine.setupSession(resolution: resolution)
-            cameraEngine.startSession()
         }
     }
 
@@ -645,15 +645,14 @@ final class CameraViewModel: ObservableObject {
     }
 
     /// 实时合成一帧并写入（在 dataOutputQueue 上调用）
-    private nonisolated func composeAndWriteFrame(timestamp: CMTime) {
+    private func composeAndWriteFrame(timestamp: CMTime) {
         guard let writer = composedWriter,
               writer.status == .writing,
               let videoInput = composedVideoInput,
               let adaptor = pixelBufferAdaptor,
-              let buffers = getBuffers(),
-              let frontPB = buffers.front else { return }
+              let frontPB = _latestFrontPixelBuffer else { return }
 
-        let backPB = buffers.back
+        let backPB = _latestBackPixelBuffer
         if !recIsDuetMode && backPB == nil { return }
 
         // 首帧启动 session
@@ -761,7 +760,7 @@ final class CameraViewModel: ObservableObject {
         adaptor.append(buffer, withPresentationTime: timestamp)
     }
 
-    private nonisolated func writeAudioSample(_ buffer: CMSampleBuffer) {
+    private func writeAudioSample(_ buffer: CMSampleBuffer) {
         guard let writer = composedWriter,
               writer.status == .writing,
               isWritingStarted,
@@ -771,7 +770,7 @@ final class CameraViewModel: ObservableObject {
     }
 
     /// 从 CVPixelBuffer 创建 CMSampleBuffer（用于预览显示）
-    private nonisolated func createSampleBufferFromPixelBuffer(_ pixelBuffer: CVPixelBuffer, timestamp: CMTime) -> CMSampleBuffer? {
+    private func createSampleBufferFromPixelBuffer(_ pixelBuffer: CVPixelBuffer, timestamp: CMTime) -> CMSampleBuffer? {
         var formatDesc: CMVideoFormatDescription?
         CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: pixelBuffer, formatDescriptionOut: &formatDesc)
         guard let format = formatDesc else { return nil }
@@ -783,7 +782,7 @@ final class CameraViewModel: ObservableObject {
     }
 
     /// CIImage aspect fill + clip（与 VideoComposer 中相同逻辑）
-    private nonisolated func fitAndClip(_ image: CIImage, into targetRect: CGRect, outputHeight: CGFloat) -> CIImage {
+    private func fitAndClip(_ image: CIImage, into targetRect: CGRect, outputHeight: CGFloat) -> CIImage {
         let imageSize = image.extent.size
         guard targetRect.width > 0, targetRect.height > 0 else {
             return CIImage(color: .clear).cropped(to: .zero)
@@ -809,7 +808,7 @@ final class CameraViewModel: ObservableObject {
     }
 
     /// PiP 遮罩（录制用，线程安全）
-    private nonisolated func applyPipMaskForRecording(_ image: CIImage, rect: CGRect, shape: PipShape, outputHeight: CGFloat) -> CIImage {
+    private func applyPipMaskForRecording(_ image: CIImage, rect: CGRect, shape: PipShape, outputHeight: CGFloat) -> CIImage {
         let ciY = outputHeight - rect.origin.y - rect.height
         let ciRect = CGRect(x: rect.origin.x, y: ciY, width: rect.width, height: rect.height)
 

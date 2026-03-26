@@ -1,5 +1,5 @@
 {
-  "identifier" : "com.flint.splitcam.products",
+  "identifier" : "com.flinter.splitcam.products",
   "nonRenewingSubscriptions" : [
 
   ],
@@ -20,7 +20,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.flint.splitcam.pro.lifetime",
+      "productID" : "com.flinter.splitcam.pro.lifetime",
       "referenceName" : "Pro Lifetime",
       "type" : "NonConsumable"
     }
@@ -115,7 +115,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.flint.splitcam.pro.monthly",
+          "productID" : "com.flinter.splitcam.pro.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Pro Monthly",
           "subscriptionGroupID" : "splitcam_pro",
@@ -149,7 +149,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.flint.splitcam.pro.yearly",
+          "productID" : "com.flinter.splitcam.pro.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Pro Yearly",
           "subscriptionGroupID" : "splitcam_pro",

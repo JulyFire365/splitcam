@@ -58,6 +58,14 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
             // 分割线 + 可拖拽区域
             dividerOverlay(in: containerSize)
         }
+        .overlay(
+            // 引导箭头提示 — 用 alignment + padding 纯布局定位，不依赖 .position()
+            Group {
+                if !hasInteracted && layout.splitMode != .pip {
+                    arrowHintOverlay(in: containerSize)
+                }
+            }
+        )
     }
 
     // MARK: - PiP Layout (画中画)
@@ -153,6 +161,38 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
         }
     }
 
+    /// 箭头提示 — 纯布局定位，不使用 .position()
+    @ViewBuilder
+    private func arrowHintOverlay(in containerSize: CGSize) -> some View {
+        if layout.splitMode == .leftRight {
+            // 左右分屏：箭头水平居中在分隔线上
+            HStack(spacing: 0) {
+                Color.clear
+                    .frame(width: containerSize.width * layout.splitRatio)
+                DividerArrowHint(isHorizontal: true)
+                    .fixedSize()
+                    .frame(width: 0) // 不占空间，居中对齐分隔线
+                Color.clear
+            }
+            .frame(height: containerSize.height)
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        } else {
+            // 上下分屏：箭头垂直居中在分隔线上
+            VStack(spacing: 0) {
+                Color.clear
+                    .frame(height: containerSize.height * layout.splitRatio)
+                DividerArrowHint(isHorizontal: false)
+                    .fixedSize()
+                    .frame(height: 0)
+                Color.clear
+            }
+            .frame(width: containerSize.width)
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
     private var pipClipShapeValue: AnyShape {
         if layout.pipShape == .circle {
             return AnyShape(Circle())
@@ -179,21 +219,6 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
         dividerLine(in: containerSize)
         dragHitArea(in: containerSize)
         dragHandle(in: containerSize)
-
-        // 引导箭头提示
-        if !hasInteracted {
-            DividerArrowHint(isHorizontal: layout.splitMode == .leftRight)
-                .position(
-                    x: layout.splitMode == .leftRight
-                        ? containerSize.width * layout.splitRatio
-                        : containerSize.width / 2,
-                    y: layout.splitMode == .topBottom
-                        ? containerSize.height * layout.splitRatio
-                        : containerSize.height / 2
-                )
-                .allowsHitTesting(false)
-                .transition(.opacity)
-        }
     }
 
     private func dividerLine(in containerSize: CGSize) -> some View {
@@ -280,30 +305,32 @@ struct DividerArrowHint: View {
     let isHorizontal: Bool // true = 左右分屏, false = 上下分屏
     @State private var animating = false
 
+    private let anim = Animation.easeInOut(duration: 1.0).repeatForever(autoreverses: true)
+
     var body: some View {
         Group {
             if isHorizontal {
                 HStack(spacing: 28) {
                     Image(systemName: "chevron.left")
                         .offset(x: animating ? -4 : 0)
+                        .animation(anim, value: animating)
                     Image(systemName: "chevron.right")
                         .offset(x: animating ? 4 : 0)
+                        .animation(anim, value: animating)
                 }
             } else {
                 VStack(spacing: 28) {
                     Image(systemName: "chevron.up")
                         .offset(y: animating ? -4 : 0)
+                        .animation(anim, value: animating)
                     Image(systemName: "chevron.down")
                         .offset(y: animating ? 4 : 0)
+                        .animation(anim, value: animating)
                 }
             }
         }
         .font(.system(size: 14, weight: .bold))
         .foregroundColor(.white.opacity(0.8))
-        .animation(
-            .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
-            value: animating
-        )
         .onAppear { animating = true }
     }
 }

@@ -30,13 +30,13 @@ struct CameraView: View {
             }
             .ignoresSafeArea(.container, edges: .bottom)
 
-            // ③ 摄像头未就绪时的黑色蒙版
-            Color.black
-                .ignoresSafeArea()
-                .opacity(viewModel.camerasReady ? 0 : 1)
-                .animation(viewModel.camerasReady ? .easeOut(duration: 0.3) : nil,
-                           value: viewModel.camerasReady)
-                .allowsHitTesting(false)
+            // ③ 摄像头未就绪时的启动画面
+            if !viewModel.camerasReady {
+                LaunchLoadingView()
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
 
             // ⑤ 快门动画 (拍照 — 上下黑幕合拢再展开)
             if viewModel.showFlashEffect {
@@ -710,6 +710,104 @@ struct FocusIndicatorView: View {
                     opacity = 0
                 }
             }
+    }
+}
+
+// MARK: - Launch Loading View (启动加载画面)
+
+struct LaunchLoadingView: View {
+    @State private var iconScale: CGFloat = 0.6
+    @State private var iconOpacity: Double = 0
+    @State private var ringRotation: Double = 0
+    @State private var ringOpacity: Double = 0
+    @State private var textOpacity: Double = 0
+
+    var body: some View {
+        ZStack {
+            // 深色渐变背景
+            LinearGradient(
+                colors: [
+                    Color(red: 0.08, green: 0.08, blue: 0.16),
+                    Color.black
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(spacing: 28) {
+                ZStack {
+                    // 外圈旋转光环
+                    Circle()
+                        .trim(from: 0, to: 0.7)
+                        .stroke(
+                            AngularGradient(
+                                colors: [
+                                    .blue.opacity(0),
+                                    .blue.opacity(0.5),
+                                    .purple.opacity(0.8)
+                                ],
+                                center: .center
+                            ),
+                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                        )
+                        .frame(width: 100, height: 100)
+                        .rotationEffect(.degrees(ringRotation))
+                        .opacity(ringOpacity)
+
+                    // App 图标
+                    Group {
+                        if let icon = UIImage(named: "AppIcon") {
+                            Image(uiImage: icon)
+                                .resizable()
+                                .frame(width: 72, height: 72)
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        } else {
+                            // fallback 镜头图标
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.blue, .purple],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 72, height: 72)
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                    .scaleEffect(iconScale)
+                    .opacity(iconOpacity)
+                }
+
+                // 加载文字
+                Text("SplitCam")
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.6))
+                    .opacity(textOpacity)
+            }
+        }
+        .onAppear {
+            // 图标弹入
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+                iconScale = 1.0
+                iconOpacity = 1
+            }
+            // 光环淡入 + 旋转
+            withAnimation(.easeIn(duration: 0.4).delay(0.3)) {
+                ringOpacity = 1
+            }
+            withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
+                ringRotation = 360
+            }
+            // 文字淡入
+            withAnimation(.easeIn(duration: 0.4).delay(0.5)) {
+                textOpacity = 1
+            }
+        }
     }
 }
 
