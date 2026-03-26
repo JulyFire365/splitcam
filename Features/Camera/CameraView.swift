@@ -103,7 +103,39 @@ struct CameraView: View {
             }
             .frame(width: previewSize.width, height: previewSize.height)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(tapToFocusOverlay(previewSize: previewSize))
+            .overlay {
+                // 对焦指示器（不拦截触摸）
+                if showFocusIndicator, let pt = focusPoint {
+                    FocusIndicatorView()
+                        .position(pt)
+                        .allowsHitTesting(false)
+                }
+            }
+            .simultaneousGesture(
+                SpatialTapGesture()
+                    .onEnded { value in
+                        let location = value.location
+                        let normalizedX = location.x / previewSize.width
+                        let normalizedY = location.y / previewSize.height
+                        let point = CGPoint(x: normalizedX, y: normalizedY)
+
+                        let isBack: Bool
+                        if viewModel.splitMode == .leftRight {
+                            isBack = viewModel.panelsSwapped ? (normalizedX > viewModel.layoutEngine.splitRatio) : (normalizedX <= viewModel.layoutEngine.splitRatio)
+                        } else if viewModel.splitMode == .topBottom {
+                            isBack = viewModel.panelsSwapped ? (normalizedY > viewModel.layoutEngine.splitRatio) : (normalizedY <= viewModel.layoutEngine.splitRatio)
+                        } else {
+                            isBack = !viewModel.panelsSwapped
+                        }
+
+                        viewModel.cameraEngine.focusAtPoint(point, isBack: isBack)
+                        focusPoint = location
+                        showFocusIndicator = true
+                        withAnimation(.easeOut(duration: 0.8).delay(0.5)) {
+                            showFocusIndicator = false
+                        }
+                    }
+            )
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
         }
     }
@@ -116,49 +148,6 @@ struct CameraView: View {
             return CGSize(width: containerSize.width, height: containerSize.width / ratio)
         } else {
             return CGSize(width: containerSize.height * ratio, height: containerSize.height)
-        }
-    }
-
-    // MARK: - Tap to Focus
-
-    private func tapToFocusOverlay(previewSize: CGSize) -> some View {
-        ZStack {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { location in
-                    // 将点击位置转为 0~1 标准坐标
-                    let normalizedX = location.x / previewSize.width
-                    let normalizedY = location.y / previewSize.height
-                    let point = CGPoint(x: normalizedX, y: normalizedY)
-
-                    // 判断点击在左侧还是右侧区域来决定对焦哪个相机
-                    let isBack: Bool
-                    if viewModel.splitMode == .leftRight {
-                        let splitX = viewModel.layoutEngine.splitRatio
-                        isBack = viewModel.panelsSwapped ? (normalizedX > splitX) : (normalizedX <= splitX)
-                    } else if viewModel.splitMode == .topBottom {
-                        let splitY = viewModel.layoutEngine.splitRatio
-                        isBack = viewModel.panelsSwapped ? (normalizedY > splitY) : (normalizedY <= splitY)
-                    } else {
-                        isBack = !viewModel.panelsSwapped
-                    }
-
-                    viewModel.cameraEngine.focusAtPoint(point, isBack: isBack)
-
-                    // 显示对焦指示器
-                    focusPoint = location
-                    showFocusIndicator = true
-                    withAnimation(.easeOut(duration: 0.8).delay(0.5)) {
-                        showFocusIndicator = false
-                    }
-                }
-
-            // 对焦指示器
-            if showFocusIndicator, let pt = focusPoint {
-                FocusIndicatorView()
-                    .position(pt)
-                    .transition(.opacity)
-            }
         }
     }
 
