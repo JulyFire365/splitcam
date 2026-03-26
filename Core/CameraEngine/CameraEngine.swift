@@ -426,29 +426,11 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         // 优先选择：多摄兼容 → 支持 HDR → 420f/420v (原生 YUV) → 最高分辨率
         let multiCamFormats = device.formats.filter { $0.isMultiCamSupported }
 
-        // 按分辨率和画质优先级排序
+        // 按分辨率排序，选最高分辨率（不强求 HDR，避免多摄性能瓶颈）
         let sortedFormats = multiCamFormats.sorted { a, b in
             let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
             let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
-            let pixelsA = Int(da.width) * Int(da.height)
-            let pixelsB = Int(db.width) * Int(db.height)
-
-            // 优先 10-bit / HDR 格式
-            let hdrA = a.isVideoHDRSupported ? 1 : 0
-            let hdrB = b.isVideoHDRSupported ? 1 : 0
-            if hdrA != hdrB { return hdrA > hdrB }
-
-            // 优先原生 YUV 格式（420v / 420f）
-            let typeA = CMFormatDescriptionGetMediaSubType(a.formatDescription)
-            let typeB = CMFormatDescriptionGetMediaSubType(b.formatDescription)
-            let yuvA = (typeA == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange ||
-                        typeA == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) ? 1 : 0
-            let yuvB = (typeB == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange ||
-                        typeB == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) ? 1 : 0
-            if yuvA != yuvB { return yuvA > yuvB }
-
-            // 最高分辨率优先
-            return pixelsA > pixelsB
+            return Int(da.width) * Int(da.height) > Int(db.width) * Int(db.height)
         }
 
         if let bestFormat = sortedFormats.first {

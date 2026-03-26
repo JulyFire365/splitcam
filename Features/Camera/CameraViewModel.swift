@@ -78,20 +78,14 @@ final class CameraViewModel: ObservableObject {
     nonisolated(unsafe) private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var composedOutputURL: URL?
     nonisolated(unsafe) private var recordingCIContext: CIContext = {
-        // 使用 Metal GPU 加速，开启高质量渲染
+        // Metal GPU 加速，实时渲染优先性能
         if let device = MTLCreateSystemDefaultDevice() {
             return CIContext(mtlDevice: device, options: [
                 .useSoftwareRenderer: false,
-                .highQualityDownsample: true,
-                .priorityRequestLow: false,
-                .workingColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
-                .outputColorSpace: CGColorSpace(name: CGColorSpace.displayP3)!
+                .priorityRequestLow: false
             ])
         }
-        return CIContext(options: [
-            .useSoftwareRenderer: false,
-            .highQualityDownsample: true
-        ])
+        return CIContext(options: [.useSoftwareRenderer: false])
     }()
     nonisolated(unsafe) private var recordingStartTime: CMTime?
     nonisolated(unsafe) private var isWritingStarted = false
@@ -737,34 +731,12 @@ final class CameraViewModel: ObservableObject {
             composite = fittedSecond.composited(over: composite)
         }
 
-        // ──── 后处理管线：模拟系统相机 ISP 效果 ────
-
-        // 1. 降噪（轻度，减少暗部噪点）
-        if let nr = CIFilter(name: "CINoiseReduction") {
-            nr.setValue(composite, forKey: kCIInputImageKey)
-            nr.setValue(0.02, forKey: "inputNoiseLevel")      // 轻微降噪
-            nr.setValue(0.40, forKey: "inputSharpness")         // 保持细节
-            if let result = nr.outputImage {
-                composite = result
-            }
-        }
-
-        // 2. 锐化（USM 锐化比简单锐化效果更自然）
-        if let usm = CIFilter(name: "CIUnsharpMask") {
-            usm.setValue(composite, forKey: kCIInputImageKey)
-            usm.setValue(0.7, forKey: kCIInputRadiusKey)       // 细腻锐化半径
-            usm.setValue(0.5, forKey: kCIInputIntensityKey)     // 适中强度
-            if let result = usm.outputImage {
-                composite = result
-            }
-        }
-
-        // 3. 微调对比度和饱和度（接近系统相机的色彩风格）
-        if let vibrance = CIFilter(name: "CIVibrance") {
-            vibrance.setValue(composite, forKey: kCIInputImageKey)
-            vibrance.setValue(0.15, forKey: "inputAmount")      // 轻微提升饱和度
-            if let result = vibrance.outputImage {
-                composite = result
+        // 轻量锐化（CISharpenLuminance 性能极高，不影响帧率）
+        if let sharpen = CIFilter(name: "CISharpenLuminance") {
+            sharpen.setValue(composite, forKey: kCIInputImageKey)
+            sharpen.setValue(0.4, forKey: kCIInputSharpnessKey)
+            if let sharpened = sharpen.outputImage {
+                composite = sharpened
             }
         }
 
