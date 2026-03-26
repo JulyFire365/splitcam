@@ -19,25 +19,47 @@ enum CaptureMode: String, Hashable {
 // MARK: - Split Mode
 
 enum SplitMode: String, CaseIterable, Identifiable {
-    case leftRight = "左右分屏"
-    case topBottom = "上下分屏"
-    case pip = "画中画"
+    case leftRight
+    case topBottom
+    case pip
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .leftRight: return "layout.leftRight".localized
+        case .topBottom: return "layout.topBottom".localized
+        case .pip:       return "layout.pip".localized
+        }
+    }
 }
 
 // MARK: - PiP Shape
 
 enum PipShape: String, CaseIterable {
-    case roundedRect = "矩形"
-    case circle = "圆形"
+    case roundedRect
+    case circle
+
+    var displayName: String {
+        switch self {
+        case .roundedRect: return "shape.rectangle".localized
+        case .circle:      return "shape.circle".localized
+        }
+    }
 }
 
 // MARK: - Shooting Mode
 
 enum ShootingMode: String, CaseIterable {
-    case photo = "拍照"
-    case video = "拍摄"
+    case photo
+    case video
+
+    var displayName: String {
+        switch self {
+        case .photo: return "mode.photo".localized
+        case .video: return "mode.video".localized
+        }
+    }
 }
 
 // MARK: - Aspect Ratio
@@ -74,8 +96,15 @@ enum AspectRatioMode: String, CaseIterable, Identifiable {
 // MARK: - Resolution Quality
 
 enum ResolutionQuality: String, CaseIterable {
-    case standard = "标准"
-    case high     = "高画质"
+    case standard
+    case high
+
+    var displayName: String {
+        switch self {
+        case .standard: return "quality.standard".localized
+        case .high:     return "quality.high".localized
+        }
+    }
 
     /// 视频码率（bps）
     var videoBitRate: Int {

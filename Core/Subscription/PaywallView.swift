@@ -56,10 +56,10 @@ struct PaywallView: View {
                     ?? manager.products.first
             }
         }
-        .alert("购买成功", isPresented: $showSuccess) {
-            Button("好的") { dismiss() }
+        .alert("purchase.success.title".localized, isPresented: $showSuccess) {
+            Button("ok".localized) { dismiss() }
         } message: {
-            Text("你已解锁 SplitCam Pro 全部功能！")
+            Text("purchase.success.message".localized)
         }
     }
 
@@ -99,11 +99,11 @@ struct PaywallView: View {
             }
             .shadow(color: .purple.opacity(0.5), radius: 20)
 
-            Text("SplitCam Pro")
+            Text("paywall.title".localized)
                 .font(.system(size: 32, weight: .bold))
                 .foregroundColor(.white)
 
-            Text("解锁全部高级功能")
+            Text("paywall.subtitle".localized)
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.7))
         }
@@ -113,7 +113,7 @@ struct PaywallView: View {
 
     private var featuresSection: some View {
         VStack(spacing: 0) {
-            ForEach(ProFeature.allCases, id: \.rawValue) { feature in
+            ForEach(ProFeature.allCases, id: \.self) { feature in
                 featureRow(feature)
                 if feature != ProFeature.allCases.last {
                     Divider()
@@ -132,14 +132,14 @@ struct PaywallView: View {
                 .foregroundColor(.orange)
                 .frame(width: 32)
 
-            Text(feature.rawValue)
+            Text(feature.displayName)
                 .font(.subheadline)
                 .foregroundColor(.white)
 
             Spacer()
 
             if feature == triggeredBy {
-                Text("NEW")
+                Text("paywall.new".localized)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.black)
                     .padding(.horizontal, 6)
@@ -202,7 +202,7 @@ struct PaywallView: View {
                             .foregroundColor(.white)
 
                         if isYearly {
-                            Text("省 61%")
+                            Text("paywall.save61".localized)
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.black)
                                 .padding(.horizontal, 6)
@@ -213,11 +213,11 @@ struct PaywallView: View {
                     }
 
                     if let trial = product.freeTrialDays, trial > 0 {
-                        Text("免费试用 \(trial) 天")
+                        Text("paywall.trialDays".localized("\(trial)"))
                             .font(.system(size: 12))
                             .foregroundColor(.orange.opacity(0.9))
                     } else if isLifetime {
-                        Text("一次付费，永久使用")
+                        Text("paywall.lifetimeDesc".localized)
                             .font(.system(size: 12))
                             .foregroundColor(.white.opacity(0.5))
                     }
@@ -251,9 +251,9 @@ struct PaywallView: View {
 
     private func planTitle(for product: Product) -> String {
         switch product.id {
-        case ProProduct.monthly.rawValue:  return "连续包月"
-        case ProProduct.yearly.rawValue:   return "连续包年"
-        case ProProduct.lifetime.rawValue: return "终身买断"
+        case ProProduct.monthly.rawValue:  return "plan.monthly".localized
+        case ProProduct.yearly.rawValue:   return "plan.yearly".localized
+        case ProProduct.lifetime.rawValue: return "plan.lifetime".localized
         default: return product.displayName
         }
     }
@@ -296,14 +296,14 @@ struct PaywallView: View {
     }
 
     private var purchaseButtonText: String {
-        guard let product = selectedProduct else { return "选择方案" }
+        guard let product = selectedProduct else { return "paywall.selectPlan".localized }
         if let trial = product.freeTrialDays, trial > 0 {
-            return "开始 \(trial) 天免费试用"
+            return "paywall.startTrial".localized("\(trial)")
         }
         if product.id == ProProduct.lifetime.rawValue {
-            return "立即购买 \(product.displayPrice)"
+            return "paywall.buyNow".localized(product.displayPrice)
         }
-        return "立即订阅 \(product.displayPrice)"
+        return "paywall.subscribeNow".localized(product.displayPrice)
     }
 
     // MARK: - Footer
@@ -313,21 +313,21 @@ struct PaywallView: View {
             Button {
                 Task { await manager.restorePurchases() }
             } label: {
-                Text("恢复购买")
+                Text("paywall.restore".localized)
                     .font(.system(size: 14))
                     .foregroundColor(.white.opacity(0.5))
             }
 
-            Text("订阅将自动续费，可随时在 App Store 设置中取消")
+            Text("paywall.terms".localized)
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.3))
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 16) {
-                Link("使用条款", destination: URL(string: "https://splitcam.app/terms")!)
+                Link("paywall.termsOfUse".localized, destination: URL(string: "https://splitcam.app/terms")!)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.4))
-                Link("隐私政策", destination: URL(string: "https://splitcam.app/privacy")!)
+                Link("paywall.privacyPolicy".localized, destination: URL(string: "https://splitcam.app/privacy")!)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.4))
             }

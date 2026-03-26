@@ -324,7 +324,7 @@ struct PipScaleHint: View {
                     .font(.system(size: 22, weight: .semibold))
                     .scaleEffect(animating ? 1.15 : 0.9)
 
-                Text("捏合缩放")
+                Text("duet.hint.pinchToZoom".localized)
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundColor(.white.opacity(0.9))

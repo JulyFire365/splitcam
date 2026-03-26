@@ -17,12 +17,23 @@ enum ProProduct: String, CaseIterable {
 
 /// 需要 Pro 才能使用的功能
 enum ProFeature: String {
-    case unlimitedRecording  = "无限录制时长"
-    case pipMode             = "画中画模式"
-    case duetMode            = "合拍模式"
-    case telephotoZoom       = "3x 长焦"
-    case allAspectRatios     = "全部画面比例"
-    case layoutSwitchWhileRecording = "录制中切换布局"
+    case unlimitedRecording
+    case pipMode
+    case duetMode
+    case telephotoZoom
+    case allAspectRatios
+    case layoutSwitchWhileRecording
+
+    var displayName: String {
+        switch self {
+        case .unlimitedRecording:        return "pro.feature.unlimitedRecording".localized
+        case .pipMode:                   return "pro.feature.pipMode".localized
+        case .duetMode:                  return "pro.feature.duetMode".localized
+        case .telephotoZoom:             return "pro.feature.telephoto".localized
+        case .allAspectRatios:           return "pro.feature.allRatios".localized
+        case .layoutSwitchWhileRecording: return "pro.feature.layoutSwitch".localized
+        }
+    }
 
     var icon: String {
         switch self {
@@ -95,7 +106,7 @@ final class SubscriptionManager: ObservableObject {
             // 按价格排序: 月 → 年 → 终身
             products = storeProducts.sorted { ($0.price as NSDecimalNumber).doubleValue < ($1.price as NSDecimalNumber).doubleValue }
         } catch {
-            errorMessage = "无法加载商品信息: \(error.localizedDescription)"
+            errorMessage = "purchase.loadError".localized(error.localizedDescription)
         }
     }
 
@@ -118,14 +129,14 @@ final class SubscriptionManager: ObservableObject {
                 return false
 
             case .pending:
-                errorMessage = "购买正在处理中，请稍候"
+                errorMessage = "purchase.pending".localized
                 return false
 
             @unknown default:
                 return false
             }
         } catch {
-            errorMessage = "购买失败: \(error.localizedDescription)"
+            errorMessage = "purchase.failed".localized(error.localizedDescription)
             return false
         }
     }
@@ -193,10 +204,10 @@ extension Product {
     var periodDescription: String? {
         guard let subscription = self.subscription else { return nil }
         switch subscription.subscriptionPeriod.unit {
-        case .month: return "月"
-        case .year:  return "年"
-        case .week:  return "周"
-        case .day:   return "天"
+        case .month: return "period.month".localized
+        case .year:  return "period.year".localized
+        case .week:  return "period.week".localized
+        case .day:   return "period.day".localized
         @unknown default: return nil
         }
     }

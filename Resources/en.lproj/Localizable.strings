@@ -1,0 +1,74 @@
+/* ===== General ===== */
+"ok" = "OK";
+"cancel" = "Cancel";
+"error" = "Error";
+"processing" = "Processing...";
+
+/* ===== Capture Mode ===== */
+"mode.photo" = "Photo";
+"mode.video" = "Video";
+
+/* ===== Split Layout ===== */
+"layout.leftRight" = "Left-Right";
+"layout.topBottom" = "Top-Bottom";
+"layout.pip" = "PiP";
+
+/* ===== PiP Shape ===== */
+"shape.rectangle" = "Rectangle";
+"shape.circle" = "Circle";
+
+/* ===== Quality ===== */
+"quality.standard" = "Standard";
+"quality.high" = "HD";
+
+/* ===== Border Style ===== */
+"border.none" = "None";
+"border.thin" = "Thin";
+"border.thick" = "Thick";
+"border.rounded" = "Rounded";
+
+/* ===== Duet Mode ===== */
+"duet" = "Duet";
+"duet.hint.pinchToZoom" = "Pinch to zoom";
+
+/* ===== Subscription - Pro Features ===== */
+"pro.feature.unlimitedRecording" = "Unlimited Recording";
+"pro.feature.pipMode" = "Picture-in-Picture";
+"pro.feature.duetMode" = "Duet Mode";
+"pro.feature.telephoto" = "3x Telephoto";
+"pro.feature.allRatios" = "All Aspect Ratios";
+"pro.feature.layoutSwitch" = "Switch Layout While Recording";
+
+/* ===== Subscription - Paywall ===== */
+"paywall.title" = "SplitCam Pro";
+"paywall.subtitle" = "Unlock All Premium Features";
+"paywall.new" = "NEW";
+"paywall.save61" = "Save 61%";
+"paywall.trialDays" = "Free trial for %@ days";
+"paywall.lifetimeDesc" = "Pay once, use forever";
+"paywall.selectPlan" = "Select Plan";
+"paywall.startTrial" = "Start %@-Day Free Trial";
+"paywall.buyNow" = "Buy Now %@";
+"paywall.subscribeNow" = "Subscribe Now %@";
+"paywall.restore" = "Restore Purchases";
+"paywall.terms" = "Subscription auto-renews. Cancel anytime in App Store settings.";
+"paywall.termsOfUse" = "Terms of Use";
+"paywall.privacyPolicy" = "Privacy Policy";
+
+/* ===== Subscription - Plan Names ===== */
+"plan.monthly" = "Monthly";
+"plan.yearly" = "Yearly";
+"plan.lifetime" = "Lifetime";
+
+/* ===== Subscription - Periods ===== */
+"period.month" = "mo";
+"period.year" = "yr";
+"period.week" = "wk";
+"period.day" = "day";
+
+/* ===== Subscription - Purchase Status ===== */
+"purchase.success.title" = "Purchase Successful";
+"purchase.success.message" = "You've unlocked all SplitCam Pro features!";
+"purchase.pending" = "Purchase is being processed, please wait";
+"purchase.failed" = "Purchase failed: %@";
+"purchase.loadError" = "Unable to load product info: %@";

@@ -65,8 +65,8 @@ struct CameraView: View {
                 viewModel.handlePickedMedia(result)
             }
         }
-        .alert("错误", isPresented: $viewModel.showError) {
-            Button("确定", role: .cancel) {}
+        .alert("error".localized, isPresented: $viewModel.showError) {
+            Button("ok".localized, role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage)
         }
@@ -437,14 +437,14 @@ struct CameraView: View {
 
     private var shootingModeBar: some View {
         HStack(spacing: 32) {
-            ForEach(ShootingMode.allCases, id: \.rawValue) { mode in
+            ForEach(ShootingMode.allCases, id: \.self) { mode in
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         viewModel.setShootingMode(mode)
                     }
                 } label: {
                     VStack(spacing: 4) {
-                        Text(mode.rawValue)
+                        Text(mode.displayName)
                             .font(.system(size: 15, weight: viewModel.shootingMode == mode ? .bold : .regular))
                             .foregroundColor(viewModel.shootingMode == mode ? .white : .white.opacity(0.5))
 
@@ -499,7 +499,7 @@ struct CameraView: View {
         HStack(spacing: 5) {
             Image(systemName: "person.2.fill")
                 .font(.system(size: 10))
-            Text("合拍")
+            Text("duet".localized)
                 .font(.system(size: 12, weight: .medium))
 
             if !viewModel.isRecording {
@@ -525,7 +525,7 @@ struct CameraView: View {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(.white)
-                Text("正在处理...")
+                Text("processing".localized)
                     .font(.subheadline)
                     .foregroundColor(.white)
             }

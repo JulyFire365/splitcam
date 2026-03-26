@@ -149,12 +149,21 @@ struct BorderStyleConfig: Equatable {
 }
 
 enum BorderType: String, CaseIterable, Identifiable {
-    case none = "无边框"
-    case thin = "细线"
-    case thick = "粗线"
-    case rounded = "圆角"
+    case none
+    case thin
+    case thick
+    case rounded
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none:    return "border.none".localized
+        case .thin:    return "border.thin".localized
+        case .thick:   return "border.thick".localized
+        case .rounded: return "border.rounded".localized
+        }
+    }
 
     var defaultWidth: CGFloat {
         switch self {

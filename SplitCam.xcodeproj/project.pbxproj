@@ -31,6 +31,8 @@
 		A10022 /* GalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023 /* GalleryView.swift */; };
 		A10023 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10024 /* SubscriptionManager.swift */; };
 		A10024 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10025 /* PaywallView.swift */; };
+		A10025 /* String+L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10027 /* String+L10n.swift */; };
+		A10026 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = V10001 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -62,6 +64,9 @@
 		B10024 /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
 		B10025 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		B10026 /* SplitCamProducts.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = SplitCamProducts.storekit; sourceTree = "<group>"; };
+		B10027 /* String+L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+L10n.swift"; sourceTree = "<group>"; };
+		V10002 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "Resources/zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		V10003 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = "Resources/en.lproj/Localizable.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -222,6 +227,7 @@
 			isa = PBXGroup;
 			children = (
 				B10018 /* Color+Hex.swift */,
+				B10027 /* String+L10n.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -238,6 +244,7 @@
 			isa = PBXGroup;
 			children = (
 				B10020 /* Assets.xcassets */,
+				V10001 /* Localizable.strings */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -330,12 +337,25 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXVariantGroup section */
+		V10001 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				V10002 /* zh-Hans */,
+				V10003 /* en */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin PBXResourcesBuildPhase section */
 		C10003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A10020 /* Assets.xcassets in Resources */,
+				A10026 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -369,6 +389,7 @@
 				A10022 /* GalleryView.swift in Sources */,
 				A10023 /* SubscriptionManager.swift in Sources */,
 				A10024 /* PaywallView.swift in Sources */,
+				A10025 /* String+L10n.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
