@@ -67,11 +67,11 @@
 		B10025 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		B10026 /* SplitCamProducts.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = SplitCamProducts.storekit; sourceTree = "<group>"; };
 		B10027 /* String+L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+L10n.swift"; sourceTree = "<group>"; };
-		V10002 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
-		V10003 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = "en.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		B10028 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		V10002 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		V10003 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		V10005 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
-		V10006 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = "en.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		V10006 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -272,14 +272,6 @@
 			path = Gallery;
 			sourceTree = "<group>";
 		};
-		D10099 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				B10000 /* SplitCam.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 		D10021 /* Subscription */ = {
 			isa = PBXGroup;
 			children = (
@@ -288,6 +280,14 @@
 				B10026 /* SplitCamProducts.storekit */,
 			);
 			path = Subscription;
+			sourceTree = "<group>";
+		};
+		D10099 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B10000 /* SplitCam.app */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -344,27 +344,6 @@
 		};
 /* End PBXProject section */
 
-/* Begin PBXVariantGroup section */
-		V10001 /* Localizable.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				V10002 /* zh-Hans */,
-				V10003 /* en */,
-			);
-			name = Localizable.strings;
-			sourceTree = "<group>";
-		};
-		V10004 /* InfoPlist.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				V10005 /* zh-Hans */,
-				V10006 /* en */,
-			);
-			name = InfoPlist.strings;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
-
 /* Begin PBXResourcesBuildPhase section */
 		C10003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
@@ -412,6 +391,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		V10001 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				V10002 /* zh-Hans */,
+				V10003 /* en */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		V10004 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				V10005 /* zh-Hans */,
+				V10006 /* en */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		F10010 /* Debug */ = {
@@ -544,6 +544,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZM8LF8494F;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SplitCam;
@@ -574,6 +575,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = ZM8LF8494F;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SplitCam;
