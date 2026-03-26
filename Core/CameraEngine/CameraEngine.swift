@@ -504,12 +504,9 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
     /// 配置视频防抖（需要在 connection 建立后调用）
     private func configureStabilization(for connection: AVCaptureConnection) {
-        // 优先使用电影级防抖 > 标准防抖
+        // 使用标准防抖：平衡画面稳定与实时跟随（cinematic 延迟太大）
         if connection.isVideoStabilizationSupported {
-            let preferred: AVCaptureVideoStabilizationMode = .cinematic
-            if connection.activeVideoStabilizationMode != preferred {
-                connection.preferredVideoStabilizationMode = preferred
-            }
+            connection.preferredVideoStabilizationMode = .standard
         }
     }
 
