@@ -81,23 +81,13 @@ struct PaywallView: View {
 
     private var headerSection: some View {
         VStack(spacing: 12) {
-            // Pro 图标
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.orange, .pink, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 80, height: 80)
-
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 36))
-                    .foregroundColor(.white)
-            }
-            .shadow(color: .purple.opacity(0.5), radius: 20)
+            // App Logo
+            Image("AppIconImage")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 88, height: 88)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .shadow(color: .purple.opacity(0.5), radius: 20)
 
             Text("paywall.title".localized)
                 .font(.system(size: 32, weight: .bold))
