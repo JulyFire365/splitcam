@@ -4,9 +4,9 @@ import SwiftUI
 // MARK: - Product Identifiers
 
 enum ProProduct: String, CaseIterable {
-    case monthly  = "com.splitcam.pro.monthly"
-    case yearly   = "com.splitcam.pro.yearly"
-    case lifetime = "com.splitcam.pro.lifetime"
+    case monthly  = "com.flint.splitcam.pro.monthly"
+    case yearly   = "com.flint.splitcam.pro.yearly"
+    case lifetime = "com.flint.splitcam.pro.lifetime"
 
     var isSubscription: Bool {
         self != .lifetime
