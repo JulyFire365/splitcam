@@ -5,15 +5,19 @@ import Photos
 /// 媒体文件目录（非 actor 隔离，供 MediaItem 使用）
 enum MediaDirectories {
     static var media: URL {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SplitCamMedia", isDirectory: true)
+        guard let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            fatalError("Documents directory not available")
+        }
+        let dir = base.appendingPathComponent("SplitCamMedia", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
 
     static var thumbnails: URL {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SplitCamThumbnails", isDirectory: true)
+        guard let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            fatalError("Documents directory not available")
+        }
+        let dir = base.appendingPathComponent("SplitCamThumbnails", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
@@ -112,6 +116,7 @@ final class MediaStore: ObservableObject {
         do {
             try FileManager.default.copyItem(at: sourceURL, to: destURL)
         } catch {
+            print("[MediaStore] Failed to save video: \(error.localizedDescription)")
             return
         }
 

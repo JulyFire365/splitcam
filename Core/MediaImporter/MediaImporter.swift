@@ -67,7 +67,7 @@ final class MediaImporter: ObservableObject, @unchecked Sendable {
         self.player = player
 
         // 监听视频播放结束
-        nonisolated(unsafe) let weakSelf = { [weak self] in self }
+        let weakSelf = { [weak self] in self }
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem,
@@ -149,7 +149,11 @@ final class MediaImporter: ObservableObject, @unchecked Sendable {
 
     func exitDuetMode() {
         if let url = importedVideoURL {
-            try? FileManager.default.removeItem(at: url)
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                print("[MediaImporter] Failed to remove temp file: \(error.localizedDescription)")
+            }
         }
         if let observer = endObserver {
             NotificationCenter.default.removeObserver(observer)

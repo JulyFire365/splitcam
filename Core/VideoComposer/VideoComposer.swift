@@ -9,7 +9,7 @@ class SplitScreenInstruction: NSObject, AVVideoCompositionInstructionProtocol {
     let timeRange: CMTimeRange
     let enablePostProcessing = false
     let containsTweening = false
-    nonisolated(unsafe) let requiredSourceTrackIDs: [NSValue]?
+    let requiredSourceTrackIDs: [NSValue]?
     let passthroughTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
 
     let trackIDA: CMPersistentTrackID
@@ -46,10 +46,10 @@ class SplitScreenInstruction: NSObject, AVVideoCompositionInstructionProtocol {
 
 /// 自定义视频合成器 — 使用 CIImage 逐帧渲染分屏画面（含裁切）
 class SplitScreenCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
-    nonisolated(unsafe) var sourcePixelBufferAttributes: [String: Any]? =
+    var sourcePixelBufferAttributes: [String: Any]? =
         [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)]
 
-    nonisolated(unsafe) var requiredPixelBufferAttributesForRenderContext: [String: Any] =
+    var requiredPixelBufferAttributesForRenderContext: [String: Any] =
         [kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)]
 
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])

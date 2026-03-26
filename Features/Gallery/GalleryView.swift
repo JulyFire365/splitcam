@@ -12,9 +12,17 @@ struct GalleryView: View {
     @State private var showShareSheet = false
 
     enum GalleryFilter: String, CaseIterable {
-        case all = "全部"
-        case photo = "照片"
-        case video = "视频"
+        case all
+        case photo
+        case video
+
+        var displayName: String {
+            switch self {
+            case .all: return "gallery.all".localized
+            case .photo: return "gallery.photo".localized
+            case .video: return "gallery.video".localized
+            }
+        }
     }
 
     private var filteredItems: [MediaItem] {
@@ -97,13 +105,13 @@ struct GalleryView: View {
 
     private var filterBar: some View {
         HStack(spacing: 0) {
-            ForEach(GalleryFilter.allCases, id: \.rawValue) { filter in
+            ForEach(GalleryFilter.allCases, id: \.self) { filter in
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         selectedFilter = filter
                     }
                 } label: {
-                    Text(filter.rawValue)
+                    Text(filter.displayName)
                         .font(.system(size: 14, weight: selectedFilter == filter ? .bold : .regular))
                         .foregroundColor(selectedFilter == filter ? .white : .gray)
                         .frame(maxWidth: .infinity)

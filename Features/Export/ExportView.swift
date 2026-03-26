@@ -44,10 +44,10 @@ struct ExportView: View {
 
     private var topBar: some View {
         HStack {
-            Button("返回") { coordinator.pop() }
+            Button("export.back".localized) { coordinator.pop() }
                 .foregroundColor(.white)
             Spacer()
-            Text("导出")
+            Text("export.title".localized)
                 .font(.headline)
                 .foregroundColor(.white)
             Spacer()
@@ -69,7 +69,7 @@ struct ExportView: View {
 
             // Resolution selector
             VStack(spacing: 12) {
-                Text("选择分辨率")
+                Text("export.selectResolution".localized)
                     .font(.subheadline)
                     .foregroundColor(.gray)
 
@@ -89,7 +89,7 @@ struct ExportView: View {
             Button(action: { viewModel.startExport() }) {
                 HStack {
                     Image(systemName: "square.and.arrow.down")
-                    Text("导出视频")
+                    Text("export.exportVideo".localized)
                 }
                 .font(.headline)
                 .foregroundColor(.white)

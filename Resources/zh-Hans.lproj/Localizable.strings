@@ -77,3 +77,14 @@
 "error.recordingInit" = "录制初始化失败";
 "error.videoSaveFailed" = "视频保存失败";
 "error.saveFailed" = "保存失败";
+
+/* ===== 导出页面 ===== */
+"export.back" = "返回";
+"export.title" = "导出";
+"export.selectResolution" = "选择分辨率";
+"export.exportVideo" = "导出视频";
+
+/* ===== 相册页面 ===== */
+"gallery.all" = "全部";
+"gallery.photo" = "照片";
+"gallery.video" = "视频";

@@ -77,3 +77,14 @@
 "error.recordingInit" = "Recording initialization failed";
 "error.videoSaveFailed" = "Failed to save video";
 "error.saveFailed" = "Save failed";
+
+/* ===== Export ===== */
+"export.back" = "Back";
+"export.title" = "Export";
+"export.selectResolution" = "Select Resolution";
+"export.exportVideo" = "Export Video";
+
+/* ===== Gallery ===== */
+"gallery.all" = "All";
+"gallery.photo" = "Photos";
+"gallery.video" = "Videos";

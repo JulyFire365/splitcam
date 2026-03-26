@@ -236,7 +236,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                 device.videoZoomFactor = clamped
                 device.unlockForConfiguration()
             } catch {
-                // Ignore zoom errors silently
+                print("[CameraEngine] Zoom configuration failed: \(error.localizedDescription)")
             }
 
             DispatchQueue.main.async {
@@ -518,10 +518,14 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                                 device.exposureMode = .continuousAutoExposure
                             }
                             device.unlockForConfiguration()
-                        } catch {}
+                        } catch {
+                            print("[CameraEngine] Failed to restore auto focus: \(error.localizedDescription)")
+                        }
                     }
                 }
-            } catch {}
+            } catch {
+                print("[CameraEngine] Tap-to-focus failed: \(error.localizedDescription)")
+            }
         }
     }
 

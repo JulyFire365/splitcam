@@ -314,12 +314,16 @@ struct PaywallView: View {
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 16) {
-                Link("paywall.termsOfUse".localized, destination: URL(string: "https://splitcam-legal.vercel.app/terms-of-use.html")!)
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.4))
-                Link("paywall.privacyPolicy".localized, destination: URL(string: "https://splitcam-legal.vercel.app/privacy-policy.html")!)
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.4))
+                if let url = URL(string: "https://splitcam-legal.vercel.app/terms-of-use.html") {
+                    Link("paywall.termsOfUse".localized, destination: url)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                if let url = URL(string: "https://splitcam-legal.vercel.app/privacy-policy.html") {
+                    Link("paywall.privacyPolicy".localized, destination: url)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+                }
             }
         }
     }

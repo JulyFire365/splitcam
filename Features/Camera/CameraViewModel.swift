@@ -52,11 +52,11 @@ final class CameraViewModel: ObservableObject {
     @Published var importedVideoBuffer: CMSampleBuffer?
 
     // Duet mode recording support
-    nonisolated(unsafe) private var importedVideoOutput: AVPlayerItemVideoOutput?
-    nonisolated(unsafe) private var importedCIImage: CIImage?
-    nonisolated(unsafe) private var recIsDuetMode: Bool = false
-    nonisolated(unsafe) private var latestImportedCIImage: CIImage?
-    nonisolated(unsafe) private var importedVideoOrientation: CGImagePropertyOrientation = .up
+    private var importedVideoOutput: AVPlayerItemVideoOutput?
+    private var importedCIImage: CIImage?
+    private var recIsDuetMode: Bool = false
+    private var latestImportedCIImage: CIImage?
+    private var importedVideoOrientation: CGImagePropertyOrientation = .up
 
     var isDuetMode: Bool {
         mediaImporter.isInDuetMode
@@ -72,12 +72,12 @@ final class CameraViewModel: ObservableObject {
     // MARK: - Real-time Composed Recording
 
     private let recordingQueue = DispatchQueue(label: "com.splitcam.recording")
-    nonisolated(unsafe) private var composedWriter: AVAssetWriter?
-    nonisolated(unsafe) private var composedVideoInput: AVAssetWriterInput?
-    nonisolated(unsafe) private var composedAudioInput: AVAssetWriterInput?
-    nonisolated(unsafe) private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
+    private var composedWriter: AVAssetWriter?
+    private var composedVideoInput: AVAssetWriterInput?
+    private var composedAudioInput: AVAssetWriterInput?
+    private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var composedOutputURL: URL?
-    nonisolated(unsafe) private var recordingCIContext: CIContext = {
+    private var recordingCIContext: CIContext = {
         // Metal GPU 加速，实时渲染优先性能
         if let device = MTLCreateSystemDefaultDevice() {
             return CIContext(mtlDevice: device, options: [
@@ -87,22 +87,41 @@ final class CameraViewModel: ObservableObject {
         }
         return CIContext(options: [.useSoftwareRenderer: false])
     }()
-    nonisolated(unsafe) private var recordingStartTime: CMTime?
-    nonisolated(unsafe) private var isWritingStarted = false
+    private var recordingStartTime: CMTime?
+    private var isWritingStarted = false
 
-    // 最新帧缓存（录制用，在 dataOutputQueue 上访问）
-    nonisolated(unsafe) private var latestFrontPixelBuffer: CVPixelBuffer?
-    nonisolated(unsafe) private var latestBackPixelBuffer: CVPixelBuffer?
+    // 最新帧缓存（录制用，通过 bufferLock 保护线程安全）
+    private let bufferLock = NSLock()
+    private var _latestFrontPixelBuffer: CVPixelBuffer?
+    private var _latestBackPixelBuffer: CVPixelBuffer?
 
-    // 布局快照（主线程更新，录制线程读取）
-    nonisolated(unsafe) private var recOutputSize: CGSize = CGSize(width: 1080, height: 1920)
-    nonisolated(unsafe) private var recSplitMode: SplitMode = .leftRight
-    nonisolated(unsafe) private var recSplitRatio: CGFloat = 0.5
-    nonisolated(unsafe) private var recPanelsSwapped: Bool = false
-    nonisolated(unsafe) private var recPipShape: PipShape = .roundedRect
-    nonisolated(unsafe) private var recPipScale: CGFloat = 0.3
-    nonisolated(unsafe) private var recPipOffset: CGSize = .zero
-    nonisolated(unsafe) private var recBorderStyle: BorderStyleConfig = .default
+    private func setFrontBuffer(_ buffer: CVPixelBuffer?) {
+        bufferLock.lock()
+        _latestFrontPixelBuffer = buffer
+        bufferLock.unlock()
+    }
+    private func setBackBuffer(_ buffer: CVPixelBuffer?) {
+        bufferLock.lock()
+        _latestBackPixelBuffer = buffer
+        bufferLock.unlock()
+    }
+    private func getBuffers() -> (front: CVPixelBuffer?, back: CVPixelBuffer?) {
+        bufferLock.lock()
+        let f = _latestFrontPixelBuffer
+        let b = _latestBackPixelBuffer
+        bufferLock.unlock()
+        return (f, b)
+    }
+
+    // 布局快照（录制开始前在主线程写入，录制期间仅在 recordingQueue 读取，不会并发写入，线程安全）
+    private var recOutputSize: CGSize = CGSize(width: 1080, height: 1920)
+    private var recSplitMode: SplitMode = .leftRight
+    private var recSplitRatio: CGFloat = 0.5
+    private var recPanelsSwapped: Bool = false
+    private var recPipShape: PipShape = .roundedRect
+    private var recPipScale: CGFloat = 0.3
+    private var recPipOffset: CGSize = .zero
+    private var recBorderStyle: BorderStyleConfig = .default
 
     // MARK: - Computed
 
@@ -171,12 +190,12 @@ final class CameraViewModel: ObservableObject {
         // 录制用帧回调（在 dataOutputQueue 上，不跳主线程）
         cameraEngine.onFrontFrameForRecording = { [weak self] buffer in
             guard let self else { return }
-            self.latestFrontPixelBuffer = CMSampleBufferGetImageBuffer(buffer)
+            self.setFrontBuffer(CMSampleBufferGetImageBuffer(buffer))
         }
 
         cameraEngine.onBackFrameForRecording = { [weak self] buffer in
             guard let self else { return }
-            self.latestBackPixelBuffer = CMSampleBufferGetImageBuffer(buffer)
+            self.setBackBuffer(CMSampleBufferGetImageBuffer(buffer))
 
             // 合拍模式 + 录制中：抓取导入视频帧（仅用于后台合成，预览显示缩略图）
             if self.recIsDuetMode, self.composedWriter != nil,
@@ -185,7 +204,7 @@ final class CameraViewModel: ObservableObject {
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
                     // videoComposition 已应用 preferredTransform，无需额外旋转
                     let ci = CIImage(cvPixelBuffer: pb, options: [
-                        .colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
+                        .colorSpace: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
                     ])
                     self.latestImportedCIImage = ci
                 }
@@ -357,7 +376,7 @@ final class CameraViewModel: ObservableObject {
                 let time = vo.itemTime(forHostTime: CACurrentMediaTime())
                 if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
                     let ci = CIImage(cvPixelBuffer: pb, options: [
-                        .colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!
+                        .colorSpace: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
                     ])
                     let ctx = CIContext()
                     if let cg = ctx.createCGImage(ci, from: ci.extent) {
@@ -631,9 +650,10 @@ final class CameraViewModel: ObservableObject {
               writer.status == .writing,
               let videoInput = composedVideoInput,
               let adaptor = pixelBufferAdaptor,
-              let frontPB = latestFrontPixelBuffer else { return }
+              let buffers = getBuffers(),
+              let frontPB = buffers.front else { return }
 
-        let backPB = latestBackPixelBuffer
+        let backPB = buffers.back
         if !recIsDuetMode && backPB == nil { return }
 
         // 首帧启动 session
@@ -645,7 +665,7 @@ final class CameraViewModel: ObservableObject {
 
         guard videoInput.isReadyForMoreMediaData else { return }
 
-        // 从快照读取当前布局参数（nonisolated(unsafe) 属性，主线程更新）
+        // 从快照读取当前布局参数（录制开始前在主线程写入）
         let currentOutputSize = recOutputSize
         let currentSplitMode = recSplitMode
         let currentSplitRatio = recSplitRatio
@@ -839,7 +859,7 @@ final class CameraViewModel: ObservableObject {
         composedAudioInput?.markAsFinished()
 
         guard let writer = composedWriter, let outputURL = composedOutputURL else { return }
-        nonisolated(unsafe) let writerRef = writer
+        let writerRef = writer
 
         writerRef.finishWriting { [weak self] in
             guard let self else { return }

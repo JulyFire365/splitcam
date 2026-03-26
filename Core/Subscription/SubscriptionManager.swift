@@ -161,7 +161,7 @@ final class SubscriptionManager: ObservableObject {
                     await transaction?.finish()
                     await self?.updatePurchasedProducts()
                 } catch {
-                    // 验证失败，忽略
+                    print("[SubscriptionManager] Transaction verification failed: \(error.localizedDescription)")
                 }
             }
         }
