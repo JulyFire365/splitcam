@@ -311,6 +311,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                         multiCamSession.addConnection(connection)
                         backConnection = connection
                         connection.videoOrientation = .portrait
+                        configureStabilization(for: connection)
                     }
                 }
 
@@ -370,6 +371,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                         frontConnection = connection
                         connection.videoOrientation = .portrait
                         connection.isVideoMirrored = true
+                        configureStabilization(for: connection)
                     }
                 }
 
@@ -420,31 +422,130 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     private func configureDevice(_ device: AVCaptureDevice, resolution: CaptureResolution) {
         try? device.lockForConfiguration()
 
-        // 从所有多摄兼容格式中选分辨率最高的
-        let formats = device.formats
-            .filter { $0.isMultiCamSupported }
-            .sorted { a, b in
-                let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
-                let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
-                return da.width * da.height > db.width * db.height
-            }
+        // ───── 1. 智能格式选择 ─────
+        // 优先选择：多摄兼容 → 支持 HDR → 420f/420v (原生 YUV) → 最高分辨率
+        let multiCamFormats = device.formats.filter { $0.isMultiCamSupported }
 
-        if let bestFormat = formats.first {
-            device.activeFormat = bestFormat
+        // 按分辨率和画质优先级排序
+        let sortedFormats = multiCamFormats.sorted { a, b in
+            let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
+            let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
+            let pixelsA = Int(da.width) * Int(da.height)
+            let pixelsB = Int(db.width) * Int(db.height)
+
+            // 优先 10-bit / HDR 格式
+            let hdrA = a.isVideoHDRSupported ? 1 : 0
+            let hdrB = b.isVideoHDRSupported ? 1 : 0
+            if hdrA != hdrB { return hdrA > hdrB }
+
+            // 优先原生 YUV 格式（420v / 420f）
+            let typeA = CMFormatDescriptionGetMediaSubType(a.formatDescription)
+            let typeB = CMFormatDescriptionGetMediaSubType(b.formatDescription)
+            let yuvA = (typeA == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange ||
+                        typeA == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) ? 1 : 0
+            let yuvB = (typeB == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange ||
+                        typeB == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) ? 1 : 0
+            if yuvA != yuvB { return yuvA > yuvB }
+
+            // 最高分辨率优先
+            return pixelsA > pixelsB
         }
 
-        // 提升色彩饱和度：使用 P3 广色域
+        if let bestFormat = sortedFormats.first {
+            device.activeFormat = bestFormat
+
+            // 设置最佳帧率范围（30fps 优先，稳定流畅）
+            let targetFPS: Double = 30
+            for range in bestFormat.videoSupportedFrameRateRanges {
+                if range.minFrameRate <= targetFPS && targetFPS <= range.maxFrameRate {
+                    device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: CMTimeScale(targetFPS))
+                    device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: CMTimeScale(targetFPS))
+                    break
+                }
+            }
+        }
+
+        // ───── 2. 连续自动对焦 ─────
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        if device.isSmoothAutoFocusSupported {
+            device.isSmoothAutoFocusEnabled = true
+        }
+
+        // ───── 3. 连续自动曝光 ─────
+        if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
+        }
+
+        // ───── 4. 连续自动白平衡 ─────
+        if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+            device.whiteBalanceMode = .continuousAutoWhiteBalance
+        }
+
+        // ───── 5. 低光增强 ─────
+        if device.isLowLightBoostSupported {
+            device.automaticallyEnablesLowLightBoostWhenAvailable = true
+        }
+
+        // ───── 6. P3 广色域 ─────
         if device.activeColorSpace != .P3_D65 &&
            device.activeFormat.supportedColorSpaces.contains(.P3_D65) {
             device.activeColorSpace = .P3_D65
         }
 
-        // 启用镜头畸变校正（提升画质清晰度）
+        // ───── 7. 镜头畸变校正 ─────
         if device.isGeometricDistortionCorrectionSupported {
             device.isGeometricDistortionCorrectionEnabled = true
         }
 
         device.unlockForConfiguration()
+    }
+
+    /// 配置视频防抖（需要在 connection 建立后调用）
+    private func configureStabilization(for connection: AVCaptureConnection) {
+        // 优先使用电影级防抖 > 标准防抖
+        if connection.isVideoStabilizationSupported {
+            let preferred: AVCaptureVideoStabilizationMode = .cinematic
+            if connection.activeVideoStabilizationMode != preferred {
+                connection.preferredVideoStabilizationMode = preferred
+            }
+        }
+    }
+
+    /// 手动对焦到指定点（屏幕坐标 0~1）
+    func focusAtPoint(_ point: CGPoint, isBack: Bool) {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            let device = isBack ? self.backDeviceInput?.device : self.frontDeviceInput?.device
+            guard let device, device.isFocusPointOfInterestSupported else { return }
+            do {
+                try device.lockForConfiguration()
+                device.focusPointOfInterest = point
+                device.focusMode = .autoFocus // 先对焦到该点
+                if device.isExposurePointOfInterestSupported {
+                    device.exposurePointOfInterest = point
+                    device.exposureMode = .autoExpose
+                }
+                device.unlockForConfiguration()
+
+                // 2秒后恢复连续自动对焦/曝光
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    self.sessionQueue.async {
+                        do {
+                            try device.lockForConfiguration()
+                            if device.isFocusModeSupported(.continuousAutoFocus) {
+                                device.focusMode = .continuousAutoFocus
+                            }
+                            if device.isExposureModeSupported(.continuousAutoExposure) {
+                                device.exposureMode = .continuousAutoExposure
+                            }
+                            device.unlockForConfiguration()
+                        } catch {}
+                    }
+                }
+            } catch {}
+        }
     }
 
     // MARK: - Recording

@@ -10,6 +10,8 @@ struct CameraView: View {
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
     @State private var paywallTrigger: ProFeature?
+    @State private var focusPoint: CGPoint?
+    @State private var showFocusIndicator = false
 
     var body: some View {
         ZStack {
@@ -101,6 +103,7 @@ struct CameraView: View {
             }
             .frame(width: previewSize.width, height: previewSize.height)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(tapToFocusOverlay(previewSize: previewSize))
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
         }
     }
@@ -113,6 +116,49 @@ struct CameraView: View {
             return CGSize(width: containerSize.width, height: containerSize.width / ratio)
         } else {
             return CGSize(width: containerSize.height * ratio, height: containerSize.height)
+        }
+    }
+
+    // MARK: - Tap to Focus
+
+    private func tapToFocusOverlay(previewSize: CGSize) -> some View {
+        ZStack {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { location in
+                    // 将点击位置转为 0~1 标准坐标
+                    let normalizedX = location.x / previewSize.width
+                    let normalizedY = location.y / previewSize.height
+                    let point = CGPoint(x: normalizedX, y: normalizedY)
+
+                    // 判断点击在左侧还是右侧区域来决定对焦哪个相机
+                    let isBack: Bool
+                    if viewModel.splitMode == .leftRight {
+                        let splitX = viewModel.layoutEngine.splitRatio
+                        isBack = viewModel.panelsSwapped ? (normalizedX > splitX) : (normalizedX <= splitX)
+                    } else if viewModel.splitMode == .topBottom {
+                        let splitY = viewModel.layoutEngine.splitRatio
+                        isBack = viewModel.panelsSwapped ? (normalizedY > splitY) : (normalizedY <= splitY)
+                    } else {
+                        isBack = !viewModel.panelsSwapped
+                    }
+
+                    viewModel.cameraEngine.focusAtPoint(point, isBack: isBack)
+
+                    // 显示对焦指示器
+                    focusPoint = location
+                    showFocusIndicator = true
+                    withAnimation(.easeOut(duration: 0.8).delay(0.5)) {
+                        showFocusIndicator = false
+                    }
+                }
+
+            // 对焦指示器
+            if showFocusIndicator, let pt = focusPoint {
+                FocusIndicatorView()
+                    .position(pt)
+                    .transition(.opacity)
+            }
         }
     }
 
@@ -650,6 +696,29 @@ struct CameraPreviewPanel: View {
 }
 
 // MARK: - Async Thumbnail
+
+// MARK: - Focus Indicator
+
+struct FocusIndicatorView: View {
+    @State private var scale: CGFloat = 1.5
+    @State private var opacity: Double = 1.0
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .stroke(Color.yellow, lineWidth: 1.5)
+            .frame(width: 70, height: 70)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .onAppear {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    scale = 1.0
+                }
+                withAnimation(.easeOut(duration: 0.8).delay(0.5)) {
+                    opacity = 0
+                }
+            }
+    }
+}
 
 struct AsyncThumbnail: View {
     let url: URL
