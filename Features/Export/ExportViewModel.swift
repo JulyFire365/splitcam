@@ -56,7 +56,7 @@ final class ExportViewModel: ObservableObject {
                     if success {
                         self.showSaveSuccess = true
                     } else {
-                        self.state = .failed(error?.localizedDescription ?? "保存失败")
+                        self.state = .failed(error?.localizedDescription ?? "error.saveFailed".localized)
                     }
                 }
             }

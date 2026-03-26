@@ -33,6 +33,8 @@
 		A10024 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10025 /* PaywallView.swift */; };
 		A10025 /* String+L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10027 /* String+L10n.swift */; };
 		A10026 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = V10001 /* Localizable.strings */; };
+		A10027 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B10028 /* PrivacyInfo.xcprivacy */; };
+		A10028 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = V10004 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -67,6 +69,9 @@
 		B10027 /* String+L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+L10n.swift"; sourceTree = "<group>"; };
 		V10002 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		V10003 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = "en.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		B10028 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		V10005 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		V10006 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = "en.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -245,6 +250,8 @@
 			children = (
 				B10020 /* Assets.xcassets */,
 				V10001 /* Localizable.strings */,
+				V10004 /* InfoPlist.strings */,
+				B10028 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -347,6 +354,15 @@
 			name = Localizable.strings;
 			sourceTree = "<group>";
 		};
+		V10004 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				V10005 /* zh-Hans */,
+				V10006 /* en */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
 /* End PBXVariantGroup section */
 
 /* Begin PBXResourcesBuildPhase section */
@@ -356,6 +372,8 @@
 			files = (
 				A10020 /* Assets.xcassets in Resources */,
 				A10026 /* Localizable.strings in Resources */,
+				A10027 /* PrivacyInfo.xcprivacy in Resources */,
+				A10028 /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

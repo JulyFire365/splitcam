@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>zh_CN</string>
+	<string>zh-Hans</string>
 	<key>CFBundleDisplayName</key>
 	<string>SplitCam</string>
 	<key>CFBundleExecutable</key>
@@ -39,7 +39,6 @@
 	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
 		<string>video-camera</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>

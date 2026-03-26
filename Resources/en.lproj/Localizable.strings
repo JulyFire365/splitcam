@@ -51,7 +51,7 @@
 "paywall.buyNow" = "Buy Now %@";
 "paywall.subscribeNow" = "Subscribe Now %@";
 "paywall.restore" = "Restore Purchases";
-"paywall.terms" = "Subscription auto-renews. Cancel anytime in App Store settings.";
+"paywall.terms" = "Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions in your App Store account settings.";
 "paywall.termsOfUse" = "Terms of Use";
 "paywall.privacyPolicy" = "Privacy Policy";
 
@@ -72,3 +72,8 @@
 "purchase.pending" = "Purchase is being processed, please wait";
 "purchase.failed" = "Purchase failed: %@";
 "purchase.loadError" = "Unable to load product info: %@";
+
+/* ===== Error Messages ===== */
+"error.recordingInit" = "Recording initialization failed";
+"error.videoSaveFailed" = "Failed to save video";
+"error.saveFailed" = "Save failed";

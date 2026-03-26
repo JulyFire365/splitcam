@@ -1,0 +1,4 @@
+NSCameraUsageDescription = "SplitCam needs camera access to capture split-screen photos and videos using both front and rear cameras simultaneously.";
+NSMicrophoneUsageDescription = "SplitCam needs microphone access to record audio for your split-screen videos.";
+NSPhotoLibraryAddUsageDescription = "SplitCam needs photo library access to save your split-screen photos and videos.";
+NSPhotoLibraryUsageDescription = "SplitCam needs photo library access to import videos for duet mode editing.";

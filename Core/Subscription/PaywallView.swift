@@ -314,10 +314,10 @@ struct PaywallView: View {
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 16) {
-                Link("paywall.termsOfUse".localized, destination: URL(string: "https://julyfire365.github.io/splitcam/terms-of-use.html")!)
+                Link("paywall.termsOfUse".localized, destination: URL(string: "https://splitcam-legal.vercel.app/terms-of-use.html")!)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.4))
-                Link("paywall.privacyPolicy".localized, destination: URL(string: "https://julyfire365.github.io/splitcam/privacy-policy.html")!)
+                Link("paywall.privacyPolicy".localized, destination: URL(string: "https://splitcam-legal.vercel.app/privacy-policy.html")!)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.4))
             }

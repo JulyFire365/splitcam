@@ -592,7 +592,7 @@ final class CameraViewModel: ObservableObject {
             recordingStartTime = nil
             isWritingStarted = false
         } catch {
-            errorMessage = "录制初始化失败: \(error.localizedDescription)"
+            errorMessage = "error.recordingInit".localized + ": \(error.localizedDescription)"
             showError = true
             return
         }
@@ -857,7 +857,7 @@ final class CameraViewModel: ObservableObject {
                     }
                     self.saveVideoToAlbum(outputURL)
                 } else {
-                    self.errorMessage = "视频保存失败"
+                    self.errorMessage = "error.videoSaveFailed".localized
                     self.showError = true
                 }
                 self.composedWriter = nil
