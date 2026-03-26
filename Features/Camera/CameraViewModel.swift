@@ -21,7 +21,7 @@ final class CameraViewModel: ObservableObject {
     @Published var shootingMode: ShootingMode = .video
     @Published var aspectRatio: AspectRatioMode = .ratio9_16
     @Published var resolution: CaptureResolution = .hd1080p
-    @Published var resolutionQuality: ResolutionQuality = .hd1080p
+    @Published var resolutionQuality: ResolutionQuality = .standard
     @Published var zoomLevel: ZoomLevel = .wide
     @Published var showVideoPicker = false
     @Published var showError = false
@@ -106,13 +106,9 @@ final class CameraViewModel: ObservableObject {
 
     // MARK: - Computed
 
-    /// 当前导出分辨率（根据比例 + 画质）
+    /// 当前导出分辨率（始终 1080p 基准，画质由码率控制）
     var currentExportSize: CGSize {
-        let base = aspectRatio.exportSize
-        if resolutionQuality == .uhd4k {
-            return CGSize(width: base.width * 2, height: base.height * 2)
-        }
-        return base
+        aspectRatio.exportSize
     }
 
     var formattedDuration: String {
@@ -263,12 +259,7 @@ final class CameraViewModel: ObservableObject {
 
     /// 同步布局参数到录制线程可访问的快照
     func syncRecordingSnapshot() {
-        let baseSize = aspectRatio.exportSize
-        if resolutionQuality == .uhd4k {
-            recOutputSize = CGSize(width: baseSize.width * 2, height: baseSize.height * 2)
-        } else {
-            recOutputSize = baseSize
-        }
+        recOutputSize = aspectRatio.exportSize
         recSplitMode = splitMode
         recSplitRatio = layoutEngine.splitRatio
         recPanelsSwapped = panelsSwapped
@@ -555,8 +546,8 @@ final class CameraViewModel: ObservableObject {
         do {
             let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 
-            // 根据分辨率动态调整码率：1080P → 20 Mbps, 4K → 50 Mbps
-            let videoBitRate: Int = resolutionQuality == .uhd4k ? 50_000_000 : 20_000_000
+            // 根据画质档位调整码率
+            let videoBitRate: Int = resolutionQuality.videoBitRate
             let videoSettings: [String: Any] = [
                 AVVideoCodecKey: AVVideoCodecType.hevc,
                 AVVideoWidthKey: Int(outputSize.width),

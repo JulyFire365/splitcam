@@ -74,8 +74,16 @@ enum AspectRatioMode: String, CaseIterable, Identifiable {
 // MARK: - Resolution Quality
 
 enum ResolutionQuality: String, CaseIterable {
-    case hd1080p = "1080P"
-    case uhd4k   = "4K"
+    case standard = "标准"
+    case high     = "高画质"
+
+    /// 视频码率（bps）
+    var videoBitRate: Int {
+        switch self {
+        case .standard: return 12_000_000   // 12 Mbps — 日常分享
+        case .high:     return 25_000_000   // 25 Mbps — 画质优先
+        }
+    }
 }
 
 // MARK: - Zoom Level

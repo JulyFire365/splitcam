@@ -462,30 +462,34 @@ struct CameraView: View {
 
     private var resolutionToggle: some View {
         Button {
-            if viewModel.resolutionQuality == .hd1080p {
-                // 4K 是 Pro 功能
+            if viewModel.resolutionQuality == .standard {
+                // 高画质是 Pro 功能
                 requirePro(.pipMode) {
                     withAnimation(.spring(response: 0.3)) {
-                        viewModel.resolutionQuality = .uhd4k
+                        viewModel.resolutionQuality = .high
                         viewModel.syncRecordingSnapshot()
                     }
                 }
             } else {
                 withAnimation(.spring(response: 0.3)) {
-                    viewModel.resolutionQuality = .hd1080p
+                    viewModel.resolutionQuality = .standard
                     viewModel.syncRecordingSnapshot()
                 }
             }
         } label: {
-            Text(viewModel.resolutionQuality.rawValue)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(viewModel.resolutionQuality == .uhd4k ? .yellow : .white.opacity(0.5))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(
-                    Capsule()
-                        .fill(viewModel.resolutionQuality == .uhd4k ? .yellow.opacity(0.2) : .clear)
-                )
+            HStack(spacing: 3) {
+                Image(systemName: viewModel.resolutionQuality == .high ? "sparkles" : "circle")
+                    .font(.system(size: 8))
+                Text(viewModel.resolutionQuality == .high ? "HD" : "SD")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+            }
+            .foregroundColor(viewModel.resolutionQuality == .high ? .yellow : .white.opacity(0.5))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(viewModel.resolutionQuality == .high ? .yellow.opacity(0.2) : .clear)
+            )
         }
     }
 
