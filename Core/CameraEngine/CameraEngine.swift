@@ -750,13 +750,13 @@ enum CameraError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .multiCamNotSupported:
-            return "此设备不支持多摄像头同时录制，需要 iPhone XS 或更新机型"
+            return "error.multiCamNotSupported".localized
         case .configurationFailed(let msg):
-            return "摄像头配置失败：\(msg)"
+            return "error.configFailed".localized(msg)
         case .permissionDenied:
-            return "请在设置中允许 SplitCam 访问摄像头和麦克风"
+            return "error.permissionDenied".localized
         case .recordingFailed(let msg):
-            return "录制失败：\(msg)"
+            return "error.recordingFailed".localized(msg)
         }
     }
 }

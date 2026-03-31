@@ -99,3 +99,9 @@
 "permission.photo.desc" = "用于保存拍摄内容和导入合拍视频";
 "permission.openSettings" = "前往设置开启";
 "permission.hint" = "开启权限后返回 App 即可自动启动相机";
+
+/* ===== 错误信息 ===== */
+"error.multiCamNotSupported" = "此设备不支持多摄像头同时录制，需要 iPhone XS 或更新机型";
+"error.configFailed" = "摄像头配置失败：%@";
+"error.permissionDenied" = "请在设置中允许 SplitCam 访问摄像头和麦克风";
+"error.recordingFailed" = "录制失败：%@";

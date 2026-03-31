@@ -99,3 +99,9 @@
 "permission.photo.desc" = "For saving captures and importing duet videos";
 "permission.openSettings" = "Open Settings";
 "permission.hint" = "Camera will start automatically after permissions are enabled";
+
+/* ===== Error Messages ===== */
+"error.multiCamNotSupported" = "This device does not support multi-camera recording. Requires iPhone XS or newer.";
+"error.configFailed" = "Camera configuration failed: %@";
+"error.permissionDenied" = "Please allow SplitCam to access camera and microphone in Settings.";
+"error.recordingFailed" = "Recording failed: %@";
