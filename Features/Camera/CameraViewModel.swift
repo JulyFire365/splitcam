@@ -37,6 +37,7 @@ final class CameraViewModel: ObservableObject {
     @Published var isDraggingDivider = false
     @Published var lastSavedThumbnail: UIImage?
     @Published var camerasReady = false
+    @Published var permissionDenied = false
 
     // MARK: - Engines
 
@@ -238,12 +239,21 @@ final class CameraViewModel: ObservableObject {
         Task {
             let granted = await cameraEngine.checkPermissions()
             guard granted else {
-                errorMessage = CameraError.permissionDenied.localizedDescription
-                showError = true
+                permissionDenied = true
                 return
             }
             // setupSession 内部配置完后会自动 startRunning，减少一次队列调度延迟
             cameraEngine.setupSession(resolution: resolution)
+        }
+    }
+
+    func recheckPermissions() {
+        Task {
+            let granted = await cameraEngine.checkPermissions()
+            if granted {
+                permissionDenied = false
+                cameraEngine.setupSession(resolution: resolution)
+            }
         }
     }
 

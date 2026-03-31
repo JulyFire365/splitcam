@@ -88,3 +88,14 @@
 "gallery.all" = "All";
 "gallery.photo" = "Photos";
 "gallery.video" = "Videos";
+
+/* ===== Permission Guide ===== */
+"permission.title" = "Permission Required";
+"permission.camera.title" = "Camera";
+"permission.camera.desc" = "For dual camera photo and video capture";
+"permission.mic.title" = "Microphone";
+"permission.mic.desc" = "For recording audio with video";
+"permission.photo.title" = "Photo Library";
+"permission.photo.desc" = "For saving captures and importing duet videos";
+"permission.openSettings" = "Open Settings";
+"permission.hint" = "Camera will start automatically after permissions are enabled";

@@ -88,3 +88,14 @@
 "gallery.all" = "全部";
 "gallery.photo" = "照片";
 "gallery.video" = "视频";
+
+/* ===== 权限引导 ===== */
+"permission.title" = "需要访问权限";
+"permission.camera.title" = "摄像头";
+"permission.camera.desc" = "用于前后双摄同时拍摄照片和视频";
+"permission.mic.title" = "麦克风";
+"permission.mic.desc" = "用于录制视频时采集音频";
+"permission.photo.title" = "相册";
+"permission.photo.desc" = "用于保存拍摄内容和导入合拍视频";
+"permission.openSettings" = "前往设置开启";
+"permission.hint" = "开启权限后返回 App 即可自动启动相机";

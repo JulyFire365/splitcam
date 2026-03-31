@@ -15,39 +15,44 @@ struct CameraView: View {
 
     var body: some View {
         ZStack {
-            // ① 全屏预览铺满
-            Color.black.ignoresSafeArea()
-            fullScreenPreview
-                .ignoresSafeArea()
-
-            // ② 浮层控件（渐变遮罩保证可读性）
-            VStack(spacing: 0) {
-                // 顶部控件 + 渐变遮罩
-                topOverlay
-                Spacer()
-                // 底部控件 + 渐变遮罩
-                bottomOverlay
-            }
-            .ignoresSafeArea(.container, edges: .bottom)
-
-            // ③ 摄像头未就绪时的启动画面
-            if !viewModel.camerasReady {
-                LaunchLoadingView()
+            if viewModel.permissionDenied {
+                // 权限未授权引导页
+                PermissionGuideView()
+            } else {
+                // ① 全屏预览铺满
+                Color.black.ignoresSafeArea()
+                fullScreenPreview
                     .ignoresSafeArea()
-                    .transition(.opacity)
-                    .allowsHitTesting(false)
-            }
 
-            // ⑤ 快门动画 (拍照 — 上下黑幕合拢再展开)
-            if viewModel.showFlashEffect {
-                ShutterAnimationView()
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
+                // ② 浮层控件（渐变遮罩保证可读性）
+                VStack(spacing: 0) {
+                    // 顶部控件 + 渐变遮罩
+                    topOverlay
+                    Spacer()
+                    // 底部控件 + 渐变遮罩
+                    bottomOverlay
+                }
+                .ignoresSafeArea(.container, edges: .bottom)
 
-            // ⑥ 处理中蒙版
-            if viewModel.isProcessing {
-                processingOverlay
+                // ③ 摄像头未就绪时的启动画面
+                if !viewModel.camerasReady {
+                    LaunchLoadingView()
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
+
+                // ⑤ 快门动画 (拍照 — 上下黑幕合拢再展开)
+                if viewModel.showFlashEffect {
+                    ShutterAnimationView()
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+
+                // ⑥ 处理中蒙版
+                if viewModel.isProcessing {
+                    processingOverlay
+                }
             }
         }
         .navigationBarHidden(true)
@@ -55,7 +60,11 @@ struct CameraView: View {
         .onAppear { viewModel.setup(mode: mode) }
         .onDisappear { viewModel.cleanup() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            viewModel.resumeSession()
+            if viewModel.permissionDenied {
+                viewModel.recheckPermissions()
+            } else {
+                viewModel.resumeSession()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             viewModel.pauseSession()
@@ -710,6 +719,124 @@ struct FocusIndicatorView: View {
                     opacity = 0
                 }
             }
+    }
+}
+
+// MARK: - Permission Guide View (权限引导页)
+
+struct PermissionGuideView: View {
+    var body: some View {
+        ZStack {
+            // 背景渐变
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.08, green: 0.08, blue: 0.16),
+                    Color(red: 0.12, green: 0.10, blue: 0.24)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 32) {
+                Spacer()
+
+                // App Icon
+                if let icon = UIImage(named: "AppIcon") {
+                    Image(uiImage: icon)
+                        .resizable()
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                } else {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 50))
+                        .foregroundColor(.white)
+                }
+
+                // 标题
+                Text("permission.title".localized)
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundColor(.white)
+
+                // 权限列表
+                VStack(spacing: 20) {
+                    permissionRow(
+                        icon: "camera.fill",
+                        color: .blue,
+                        title: "permission.camera.title".localized,
+                        desc: "permission.camera.desc".localized
+                    )
+                    permissionRow(
+                        icon: "mic.fill",
+                        color: .orange,
+                        title: "permission.mic.title".localized,
+                        desc: "permission.mic.desc".localized
+                    )
+                    permissionRow(
+                        icon: "photo.fill",
+                        color: .green,
+                        title: "permission.photo.title".localized,
+                        desc: "permission.photo.desc".localized
+                    )
+                }
+                .padding(.horizontal, 24)
+
+                Spacer()
+
+                // 打开设置按钮
+                Button(action: openSettings) {
+                    Text("permission.openSettings".localized)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .padding(.horizontal, 40)
+
+                Text("permission.hint".localized)
+                    .font(.system(size: 13))
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+
+                Spacer().frame(height: 40)
+            }
+        }
+    }
+
+    private func permissionRow(icon: String, color: Color, title: String, desc: String) -> some View {
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(color.opacity(0.2))
+                    .frame(width: 44, height: 44)
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(color)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(desc)
+                    .font(.system(size: 13))
+                    .foregroundColor(.gray)
+            }
+            Spacer()
+        }
+    }
+
+    private func openSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 }
 
