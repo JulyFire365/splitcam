@@ -439,10 +439,13 @@ struct CameraView: View {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         viewModel.setShootingMode(mode)
-                        // 切到视频模式时，非 Pro 用户回退 PiP
+                        // 切到视频模式时，非 Pro 用户回退 PiP 和合拍
                         if mode == .video && !subscriptionManager.isPro {
                             if viewModel.splitMode == .pip {
                                 viewModel.splitMode = .leftRight
+                            }
+                            if viewModel.isDuetMode {
+                                viewModel.exitDuetMode()
                             }
                         }
                     }
