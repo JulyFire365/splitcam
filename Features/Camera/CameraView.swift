@@ -82,13 +82,6 @@ struct CameraView: View {
         .fullScreenCover(isPresented: $showPaywall) {
             PaywallView(triggeredBy: paywallTrigger)
         }
-        .onChange(of: viewModel.freeRecordingLimitReached) { reached in
-            if reached {
-                paywallTrigger = .unlimitedRecording
-                showPaywall = true
-                viewModel.freeRecordingLimitReached = false
-            }
-        }
     }
 
     // MARK: - Full Screen Preview
@@ -166,9 +159,12 @@ struct CameraView: View {
         VStack(spacing: 0) {
             // 渐变遮罩背景
             HStack(alignment: .center) {
-                // 左: 导入按钮 (合拍 Pro)
+                // 左: 导入按钮 (合拍，视频模式需要 Pro)
                 toolButton(icon: "photo.badge.plus") {
-                    requirePro(.duetMode) {
+                    if viewModel.shootingMode == .video && !subscriptionManager.isPro {
+                        paywallTrigger = .duetMode
+                        showPaywall = true
+                    } else {
                         viewModel.showVideoPicker = true
                     }
                 }
@@ -258,8 +254,9 @@ struct CameraView: View {
         HStack(spacing: 0) {
             ForEach(SplitMode.allCases) { splitMode in
                 Button {
-                    if splitMode == .pip && !subscriptionManager.isPro {
-                        requirePro(.pipMode) {}
+                    if splitMode == .pip && !subscriptionManager.isPro && viewModel.shootingMode == .video {
+                        paywallTrigger = .pipMode
+                        showPaywall = true
                     } else {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             viewModel.splitMode = splitMode
@@ -276,8 +273,8 @@ struct CameraView: View {
                                     .fill(viewModel.splitMode == splitMode ? .white.opacity(0.25) : .clear)
                             )
 
-                        // Pro 锁标（拍照模式下不显示）
-                        if splitMode == .pip && !subscriptionManager.isPro && viewModel.shootingMode != .photo {
+                        // Pro 锁标（仅视频模式显示）
+                        if splitMode == .pip && !subscriptionManager.isPro && viewModel.shootingMode == .video {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 7))
                                 .foregroundColor(.orange)
@@ -298,12 +295,8 @@ struct CameraView: View {
             // 比例选项
             ForEach(AspectRatioMode.allCases) { ratio in
                 Button {
-                    if ratio != .ratio9_16 && !subscriptionManager.isPro {
-                        requirePro(.allAspectRatios) {}
-                    } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            viewModel.setAspectRatio(ratio)
-                        }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        viewModel.setAspectRatio(ratio)
                     }
                 } label: {
                     Text(ratio.rawValue)
@@ -337,12 +330,8 @@ struct CameraView: View {
         HStack(spacing: 6) {
             ForEach(ZoomLevel.allCases, id: \.rawValue) { level in
                 Button {
-                    if level == .telephoto && !subscriptionManager.isPro {
-                        requirePro(.telephotoZoom) {}
-                    } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            viewModel.setZoom(level)
-                        }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        viewModel.setZoom(level)
                     }
                 } label: {
                     Text(level.label)
@@ -450,16 +439,10 @@ struct CameraView: View {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         viewModel.setShootingMode(mode)
-                        // 切到视频模式时，回退非 Pro 用户的 Pro 功能
+                        // 切到视频模式时，非 Pro 用户回退 PiP
                         if mode == .video && !subscriptionManager.isPro {
                             if viewModel.splitMode == .pip {
                                 viewModel.splitMode = .leftRight
-                            }
-                            if viewModel.zoomLevel == .telephoto {
-                                viewModel.setZoom(.wide)
-                            }
-                            if viewModel.aspectRatio != .ratio9_16 {
-                                viewModel.aspectRatio = .ratio9_16
                             }
                         }
                     }
@@ -484,15 +467,9 @@ struct CameraView: View {
     private var resolutionToggle: some View {
         Button {
             if viewModel.resolutionQuality == .standard {
-                // 高画质是 Pro 功能（拍照和录像都需要 Pro）
-                if subscriptionManager.isPro {
-                    withAnimation(.spring(response: 0.3)) {
-                        viewModel.resolutionQuality = .high
-                        viewModel.syncRecordingSnapshot()
-                    }
-                } else {
-                    paywallTrigger = .unlimitedRecording
-                    showPaywall = true
+                withAnimation(.spring(response: 0.3)) {
+                    viewModel.resolutionQuality = .high
+                    viewModel.syncRecordingSnapshot()
                 }
             } else {
                 withAnimation(.spring(response: 0.3)) {
@@ -592,16 +569,6 @@ struct CameraView: View {
     }
 
     // MARK: - Helpers
-
-    /// 检查 Pro 功能，未订阅则弹付费墙（拍照模式下全部免费）
-    private func requirePro(_ feature: ProFeature, action: @escaping () -> Void) {
-        if subscriptionManager.isPro || viewModel.shootingMode == .photo {
-            action()
-        } else {
-            paywallTrigger = feature
-            showPaywall = true
-        }
-    }
 
     private func splitModeIcon(_ mode: SplitMode) -> String {
         switch mode {

@@ -15,34 +15,22 @@ enum ProProduct: String, CaseIterable {
 
 // MARK: - Pro Feature
 
-/// 需要 Pro 才能使用的功能
+/// 需要 Pro 才能使用的功能（仅录像模式下的画中画和合拍）
 enum ProFeature: String {
-    case unlimitedRecording
     case pipMode
     case duetMode
-    case telephotoZoom
-    case allAspectRatios
-    case layoutSwitchWhileRecording
 
     var displayName: String {
         switch self {
-        case .unlimitedRecording:        return "pro.feature.unlimitedRecording".localized
-        case .pipMode:                   return "pro.feature.pipMode".localized
-        case .duetMode:                  return "pro.feature.duetMode".localized
-        case .telephotoZoom:             return "pro.feature.telephoto".localized
-        case .allAspectRatios:           return "pro.feature.allRatios".localized
-        case .layoutSwitchWhileRecording: return "pro.feature.layoutSwitch".localized
+        case .pipMode:   return "pro.feature.pipMode".localized
+        case .duetMode:  return "pro.feature.duetMode".localized
         }
     }
 
     var icon: String {
         switch self {
-        case .unlimitedRecording: return "infinity"
-        case .pipMode:            return "pip"
-        case .duetMode:           return "person.2.fill"
-        case .telephotoZoom:      return "camera.metering.spot"
-        case .allAspectRatios:    return "aspectratio"
-        case .layoutSwitchWhileRecording: return "rectangle.2.swap"
+        case .pipMode:   return "pip"
+        case .duetMode:  return "person.2.fill"
         }
     }
 }
@@ -60,11 +48,6 @@ final class SubscriptionManager: ObservableObject {
     @Published private(set) var purchasedProductIDs: Set<String> = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
-
-    // MARK: - Free Tier Limits
-
-    /// 免费版最大录制时长（秒）
-    static let freeRecordingLimit: TimeInterval = 90
 
     // MARK: - Private
 

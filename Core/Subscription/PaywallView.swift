@@ -333,12 +333,8 @@ struct PaywallView: View {
 
 extension ProFeature: CaseIterable {
     static var allCases: [ProFeature] = [
-        .unlimitedRecording,
         .pipMode,
         .duetMode,
-        .telephotoZoom,
-        .allAspectRatios,
-        .layoutSwitchWhileRecording
     ]
 }
 
