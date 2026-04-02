@@ -18,8 +18,8 @@ final class CameraViewModel: ObservableObject {
             syncRecordingSnapshot()
         }
     }
-    @Published var shootingMode: ShootingMode = .video
-    @Published var aspectRatio: AspectRatioMode = .ratio9_16
+    @Published var shootingMode: ShootingMode = .photo
+    @Published var aspectRatio: AspectRatioMode = .ratio3_4
     @Published var resolution: CaptureResolution = .hd1080p
     @Published var resolutionQuality: ResolutionQuality = .standard
     @Published var zoomLevel: ZoomLevel = .wide

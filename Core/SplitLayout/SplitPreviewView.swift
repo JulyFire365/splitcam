@@ -222,11 +222,10 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
     }
 
     private func dividerLine(in containerSize: CGSize) -> some View {
-        // 细线分隔 — 使用半透明白色 + 模糊效果模拟毛玻璃
-        let lineThickness: CGFloat = 1.5
+        let lineThickness: CGFloat = 1.0
 
         return Rectangle()
-            .fill(.white.opacity(0.5))
+            .fill(.white)
             .frame(
                 width: layout.splitMode == .leftRight ? lineThickness : containerSize.width,
                 height: layout.splitMode == .topBottom ? lineThickness : containerSize.height
