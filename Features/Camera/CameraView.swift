@@ -276,8 +276,8 @@ struct CameraView: View {
                                     .fill(viewModel.splitMode == splitMode ? .white.opacity(0.25) : .clear)
                             )
 
-                        // Pro 锁标
-                        if splitMode == .pip && !subscriptionManager.isPro {
+                        // Pro 锁标（拍照模式下不显示）
+                        if splitMode == .pip && !subscriptionManager.isPro && viewModel.shootingMode != .photo {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 7))
                                 .foregroundColor(.orange)
@@ -450,6 +450,18 @@ struct CameraView: View {
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         viewModel.setShootingMode(mode)
+                        // 切到视频模式时，回退非 Pro 用户的 Pro 功能
+                        if mode == .video && !subscriptionManager.isPro {
+                            if viewModel.splitMode == .pip {
+                                viewModel.splitMode = .leftRight
+                            }
+                            if viewModel.zoomLevel == .telephoto {
+                                viewModel.setZoom(.wide)
+                            }
+                            if viewModel.aspectRatio != .ratio9_16 {
+                                viewModel.aspectRatio = .ratio9_16
+                            }
+                        }
                     }
                 } label: {
                     VStack(spacing: 4) {
@@ -472,12 +484,15 @@ struct CameraView: View {
     private var resolutionToggle: some View {
         Button {
             if viewModel.resolutionQuality == .standard {
-                // 高画质是 Pro 功能
-                requirePro(.pipMode) {
+                // 高画质是 Pro 功能（拍照和录像都需要 Pro）
+                if subscriptionManager.isPro {
                     withAnimation(.spring(response: 0.3)) {
                         viewModel.resolutionQuality = .high
                         viewModel.syncRecordingSnapshot()
                     }
+                } else {
+                    paywallTrigger = .unlimitedRecording
+                    showPaywall = true
                 }
             } else {
                 withAnimation(.spring(response: 0.3)) {
@@ -578,9 +593,9 @@ struct CameraView: View {
 
     // MARK: - Helpers
 
-    /// 检查 Pro 功能，未订阅则弹付费墙
+    /// 检查 Pro 功能，未订阅则弹付费墙（拍照模式下全部免费）
     private func requirePro(_ feature: ProFeature, action: @escaping () -> Void) {
-        if subscriptionManager.isPro {
+        if subscriptionManager.isPro || viewModel.shootingMode == .photo {
             action()
         } else {
             paywallTrigger = feature

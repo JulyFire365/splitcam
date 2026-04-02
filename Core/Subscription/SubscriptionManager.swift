@@ -64,7 +64,7 @@ final class SubscriptionManager: ObservableObject {
     // MARK: - Free Tier Limits
 
     /// 免费版最大录制时长（秒）
-    static let freeRecordingLimit: TimeInterval = 30
+    static let freeRecordingLimit: TimeInterval = 90
 
     // MARK: - Private
 
