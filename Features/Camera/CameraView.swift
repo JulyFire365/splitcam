@@ -192,28 +192,25 @@ struct CameraView: View {
                 .ignoresSafeArea()
             )
 
-            // 比例选择器 + 合拍标签（录制时隐藏）
-            if !viewModel.isRecording {
-                ZStack {
-                    // 比例栏：无合拍时居中，有合拍时左移
-                    HStack {
-                        aspectRatioBar
-                        if viewModel.isDuetMode { Spacer() }
-                    }
-                    .frame(maxWidth: .infinity)
+            // 比例选择器 + 合拍标签
+            ZStack {
+                // 比例栏：无合拍时居中，有合拍时左移
+                HStack {
+                    aspectRatioBar
+                    if viewModel.isDuetMode { Spacer() }
+                }
+                .frame(maxWidth: .infinity)
 
-                    // 合拍胶囊：右对齐
-                    if viewModel.isDuetMode {
-                        HStack {
-                            Spacer()
-                            duetModeBadge
-                        }
+                // 合拍胶囊：右对齐
+                if viewModel.isDuetMode {
+                    HStack {
+                        Spacer()
+                        duetModeBadge
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
         }
     }
 

@@ -947,11 +947,20 @@ final class CameraViewModel: ObservableObject {
                         importedVideoOrientation = .up
                     }
 
-                    // 视频播放结束自动停止录制
+                    // 视频播放结束：录制中自动停止，预览中循环播放
                     mediaImporter.onVideoDidEnd = { [weak self] in
-                        guard let self, self.isRecording else { return }
-                        self.stopRecording()
+                        guard let self else { return }
+                        if self.isRecording {
+                            self.stopRecording()
+                        } else {
+                            // 预览循环播放
+                            self.importedPlayer?.seek(to: .zero)
+                            self.importedPlayer?.play()
+                        }
                     }
+
+                    // 导入后立即开始预览播放
+                    player.play()
                 } else {
                     try await mediaImporter.importImage(from: result)
                     if case .image(let image) = mediaImporter.importedContent {

@@ -378,7 +378,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                         frontConnection = connection
                         connection.videoOrientation = .portrait
                         connection.isVideoMirrored = true
-                        configureStabilization(for: connection)
+                        configureStabilization(for: connection, isFront: true)
                     }
                 }
 
@@ -491,10 +491,10 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     }
 
     /// 配置视频防抖（需要在 connection 建立后调用）
-    private func configureStabilization(for connection: AVCaptureConnection) {
-        // 使用标准防抖：平衡画面稳定与实时跟随（cinematic 延迟太大）
+    private func configureStabilization(for connection: AVCaptureConnection, isFront: Bool = false) {
         if connection.isVideoStabilizationSupported {
-            connection.preferredVideoStabilizationMode = .standard
+            // 前摄不加防抖（减少延迟），后摄用标准防抖
+            connection.preferredVideoStabilizationMode = isFront ? .off : .standard
         }
     }
 
