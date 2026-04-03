@@ -292,6 +292,8 @@ struct CameraView: View {
             // 比例选项
             ForEach(AspectRatioMode.allCases) { ratio in
                 Button {
+                    // 录制中不允许切换比例（AVAssetWriter 尺寸已固定）
+                    guard !viewModel.isRecording else { return }
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         viewModel.setAspectRatio(ratio)
                     }
@@ -306,6 +308,7 @@ struct CameraView: View {
                                 .fill(viewModel.aspectRatio == ratio ? .white.opacity(0.2) : .clear)
                         )
                 }
+                .opacity(viewModel.isRecording && viewModel.aspectRatio != ratio ? 0.3 : 1)
             }
 
             // 分隔线

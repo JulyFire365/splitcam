@@ -287,9 +287,10 @@ final class CameraViewModel: ObservableObject {
 
     /// 同步布局参数到录制线程可访问的快照
     func syncRecordingSnapshot() {
-        // 录制中不更新快照，避免 AVAssetWriter 尺寸/布局不一致导致导出异常
-        guard !isRecording else { return }
-        recOutputSize = aspectRatio.exportSize
+        // 录制中：outputSize 不可变（AVAssetWriter 已固定），其余布局参数实时同步
+        if !isRecording {
+            recOutputSize = aspectRatio.exportSize
+        }
         recSplitMode = splitMode
         recSplitRatio = layoutEngine.splitRatio
         recPanelsSwapped = panelsSwapped
