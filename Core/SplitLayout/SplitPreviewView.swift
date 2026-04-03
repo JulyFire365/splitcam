@@ -222,7 +222,7 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
     }
 
     private func dividerLine(in containerSize: CGSize) -> some View {
-        let lineThickness: CGFloat = 1.0
+        let lineThickness: CGFloat = 0.5
 
         return Rectangle()
             .fill(.white)
