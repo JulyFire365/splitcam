@@ -224,22 +224,43 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
     // MARK: - Zoom
 
+    /// 当前用于后摄的分辨率（切换镜头时需要）
+    private var currentResolution: CaptureResolution = .hd1080p
+
     func setZoom(_ level: ZoomLevel) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             guard let device = self.backDeviceInput?.device else { return }
-
-            // If using ultra-wide camera: factor 1.0 = 0.5x, 2.0 = 1x, 6.0 = 3x
-            // If using wide-angle camera: factor 1.0 = 1x, 3.0 = 3x
             let isUltraWide = device.deviceType == .builtInUltraWideCamera
+
+            // 判断是否需要切换物理镜头
+            let needUltraWide = (level == .ultraWide)
+            let needSwitch = (needUltraWide && !isUltraWide) || (!needUltraWide && isUltraWide)
+
+            if needSwitch {
+                let targetType: AVCaptureDevice.DeviceType = needUltraWide
+                    ? .builtInUltraWideCamera : .builtInWideAngleCamera
+                if let newCamera = AVCaptureDevice.default(targetType, for: .video, position: .back) {
+                    self.switchBackCamera(to: newCamera, zoomLevel: level)
+                    return
+                }
+                // 目标镜头不可用，回退到数码变焦
+            }
+
+            // 同一镜头内的数码变焦
             let factor: CGFloat
-            switch level {
-            case .ultraWide:
-                factor = isUltraWide ? 1.0 : device.minAvailableVideoZoomFactor
-            case .wide:
-                factor = isUltraWide ? 2.0 : 1.0
-            case .telephoto:
-                factor = isUltraWide ? 6.0 : 3.0
+            if isUltraWide {
+                switch level {
+                case .ultraWide:  factor = 1.0
+                case .wide:       factor = 2.0
+                case .telephoto:  factor = 6.0
+                }
+            } else {
+                switch level {
+                case .ultraWide:  factor = device.minAvailableVideoZoomFactor
+                case .wide:       factor = 1.0
+                case .telephoto:  factor = 3.0
+                }
             }
 
             let clamped = min(max(factor, device.minAvailableVideoZoomFactor),
@@ -248,13 +269,99 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                 try device.lockForConfiguration()
                 device.videoZoomFactor = clamped
                 device.unlockForConfiguration()
-            } catch {
-                print("[CameraEngine] Zoom configuration failed: \(error.localizedDescription)")
-            }
+            } catch {}
 
             DispatchQueue.main.async {
                 self.currentZoom = level
             }
+        }
+    }
+
+    /// 热切换后摄物理镜头（在 sessionQueue 上调用）
+    private func switchBackCamera(to newCamera: AVCaptureDevice, zoomLevel: ZoomLevel) {
+        multiCamSession.beginConfiguration()
+
+        // 移除旧的后摄 input、video connection、photo output
+        if let oldInput = backDeviceInput {
+            multiCamSession.removeInput(oldInput)
+        }
+        if let oldVideoOutput = backVideoOutput {
+            // 移除连接但保留 output（复用）
+            if let conn = backConnection {
+                multiCamSession.removeConnection(conn)
+                backConnection = nil
+            }
+        }
+        if let oldPhotoOutput = backPhotoOutput {
+            multiCamSession.removeOutput(oldPhotoOutput)
+            backPhotoOutput = nil
+        }
+
+        // 添加新的后摄 input
+        do {
+            let newInput = try AVCaptureDeviceInput(device: newCamera)
+            if multiCamSession.canAddInput(newInput) {
+                multiCamSession.addInputWithNoConnections(newInput)
+                backDeviceInput = newInput
+            }
+
+            // 重建 video connection（复用已有的 output）
+            if let output = backVideoOutput,
+               let inputPort = newInput.ports(for: .video, sourceDeviceType: newCamera.deviceType, sourceDevicePosition: .back).first {
+                let connection = AVCaptureConnection(inputPorts: [inputPort], output: output)
+                if multiCamSession.canAddConnection(connection) {
+                    multiCamSession.addConnection(connection)
+                    backConnection = connection
+                    connection.videoOrientation = .portrait
+                    configureStabilization(for: connection)
+                }
+            }
+
+            // 重建 photo output + connection
+            let newPhoto = AVCapturePhotoOutput()
+            newPhoto.maxPhotoQualityPrioritization = .balanced
+            if multiCamSession.canAddOutput(newPhoto) {
+                multiCamSession.addOutputWithNoConnections(newPhoto)
+                if let photoPort = newInput.ports(for: .video, sourceDeviceType: newCamera.deviceType, sourceDevicePosition: .back).first {
+                    let photoConn = AVCaptureConnection(inputPorts: [photoPort], output: newPhoto)
+                    if multiCamSession.canAddConnection(photoConn) {
+                        multiCamSession.addConnection(photoConn)
+                        photoConn.videoOrientation = .portrait
+                    }
+                }
+                backPhotoOutput = newPhoto
+            }
+
+            configureDevice(newCamera, resolution: currentResolution)
+
+            // 设置变焦
+            let isUltraWide = newCamera.deviceType == .builtInUltraWideCamera
+            let factor: CGFloat
+            if isUltraWide {
+                switch zoomLevel {
+                case .ultraWide:  factor = 1.0
+                case .wide:       factor = 2.0
+                case .telephoto:  factor = 6.0
+                }
+            } else {
+                switch zoomLevel {
+                case .ultraWide:  factor = newCamera.minAvailableVideoZoomFactor
+                case .wide:       factor = 1.0
+                case .telephoto:  factor = 3.0
+                }
+            }
+            try? newCamera.lockForConfiguration()
+            newCamera.videoZoomFactor = min(max(factor, newCamera.minAvailableVideoZoomFactor),
+                                            newCamera.maxAvailableVideoZoomFactor)
+            newCamera.unlockForConfiguration()
+        } catch {}
+
+        multiCamSession.commitConfiguration()
+
+        let newIsUltraWide = newCamera.deviceType == .builtInUltraWideCamera
+        DispatchQueue.main.async {
+            self.currentZoom = zoomLevel
+            self.isBackUltraWide = newIsUltraWide
         }
     }
 
@@ -278,6 +385,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     // MARK: - Session Configuration
 
     private func configureSession(resolution: CaptureResolution) {
+        currentResolution = resolution
         guard AVCaptureMultiCamSession.isMultiCamSupported else {
             DispatchQueue.main.async {
                 self.error = .multiCamNotSupported
