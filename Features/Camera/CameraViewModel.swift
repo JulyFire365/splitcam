@@ -287,6 +287,8 @@ final class CameraViewModel: ObservableObject {
 
     /// 同步布局参数到录制线程可访问的快照
     func syncRecordingSnapshot() {
+        // 录制中不更新快照，避免 AVAssetWriter 尺寸/布局不一致导致导出异常
+        guard !isRecording else { return }
         recOutputSize = aspectRatio.exportSize
         recSplitMode = splitMode
         recSplitRatio = layoutEngine.splitRatio
@@ -947,20 +949,11 @@ final class CameraViewModel: ObservableObject {
                         importedVideoOrientation = .up
                     }
 
-                    // 视频播放结束：录制中自动停止，预览中循环播放
+                    // 视频播放结束自动停止录制
                     mediaImporter.onVideoDidEnd = { [weak self] in
-                        guard let self else { return }
-                        if self.isRecording {
-                            self.stopRecording()
-                        } else {
-                            // 预览循环播放
-                            self.importedPlayer?.seek(to: .zero)
-                            self.importedPlayer?.play()
-                        }
+                        guard let self, self.isRecording else { return }
+                        self.stopRecording()
                     }
-
-                    // 导入后立即开始预览播放
-                    player.play()
                 } else {
                     try await mediaImporter.importImage(from: result)
                     if case .image(let image) = mediaImporter.importedContent {
