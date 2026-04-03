@@ -307,6 +307,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                 output.videoSettings = [
                     kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
                 ]
+                output.alwaysDiscardsLateVideoFrames = true
                 output.setSampleBufferDelegate(self, queue: dataOutputQueue)
                 if multiCamSession.canAddOutput(output) {
                     multiCamSession.addOutputWithNoConnections(output)
@@ -335,7 +336,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
                 // 后摄 Photo Output（ISP 管线拍照）
                 let backPhoto = AVCapturePhotoOutput()
-                backPhoto.maxPhotoQualityPrioritization = .quality
+                backPhoto.maxPhotoQualityPrioritization = .balanced
                 if multiCamSession.canAddOutput(backPhoto) {
                     multiCamSession.addOutputWithNoConnections(backPhoto)
                     if let photoPort = input.ports(for: .video, sourceDeviceType: backCamera.deviceType, sourceDevicePosition: .back).first {
@@ -365,6 +366,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                 output.videoSettings = [
                     kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
                 ]
+                output.alwaysDiscardsLateVideoFrames = true
                 output.setSampleBufferDelegate(self, queue: dataOutputQueue)
                 if multiCamSession.canAddOutput(output) {
                     multiCamSession.addOutputWithNoConnections(output)
@@ -386,7 +388,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
                 // 前摄 Photo Output（ISP 管线拍照）
                 let frontPhoto = AVCapturePhotoOutput()
-                frontPhoto.maxPhotoQualityPrioritization = .quality
+                frontPhoto.maxPhotoQualityPrioritization = .balanced
                 if multiCamSession.canAddOutput(frontPhoto) {
                     multiCamSession.addOutputWithNoConnections(frontPhoto)
                     if let photoPort = input.ports(for: .video, sourceDeviceType: frontCamera.deviceType, sourceDevicePosition: .front).first {
@@ -429,20 +431,37 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         try? device.lockForConfiguration()
 
         // ───── 1. 智能格式选择 ─────
-        // 优先选择：多摄兼容 → 支持 HDR → 420f/420v (原生 YUV) → 最高分辨率
+        // 优先选 1080p 多摄格式（启动快、功耗低），不盲目选最高分辨率
         let multiCamFormats = device.formats.filter { $0.isMultiCamSupported }
 
-        // 按分辨率排序，选最高分辨率（不强求 HDR，避免多摄性能瓶颈）
-        let sortedFormats = multiCamFormats.sorted { a, b in
+        // 目标：1920x1080 附近的格式（宽度 1080~1920）
+        let targetWidth: Int32 = 1920
+        let targetHeight: Int32 = 1080
+
+        // 先找 1080p 格式
+        let preferred = multiCamFormats.filter {
+            let d = CMVideoFormatDescriptionGetDimensions($0.formatDescription)
+            return d.width >= targetHeight && d.width <= targetWidth && d.height >= targetHeight
+        }.sorted { a, b in
+            let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
+            let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
+            // 优先选接近 1080p 的
+            let diffA = abs(Int(da.width) - Int(targetWidth)) + abs(Int(da.height) - Int(targetHeight))
+            let diffB = abs(Int(db.width) - Int(targetWidth)) + abs(Int(db.height) - Int(targetHeight))
+            return diffA < diffB
+        }
+
+        // 如果没有 1080p，回退到最高分辨率
+        let fallback = multiCamFormats.sorted { a, b in
             let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
             let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
             return Int(da.width) * Int(da.height) > Int(db.width) * Int(db.height)
         }
 
-        if let bestFormat = sortedFormats.first {
+        if let bestFormat = preferred.first ?? fallback.first {
             device.activeFormat = bestFormat
 
-            // 设置最佳帧率范围（30fps 优先，稳定流畅）
+            // 设置帧率 30fps
             let targetFPS: Double = 30
             for range in bestFormat.videoSupportedFrameRateRanges {
                 if range.minFrameRate <= targetFPS && targetFPS <= range.maxFrameRate {
@@ -476,13 +495,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             device.automaticallyEnablesLowLightBoostWhenAvailable = true
         }
 
-        // ───── 6. P3 广色域 ─────
-        if device.activeColorSpace != .P3_D65 &&
-           device.activeFormat.supportedColorSpaces.contains(.P3_D65) {
-            device.activeColorSpace = .P3_D65
-        }
-
-        // ───── 7. 镜头畸变校正 ─────
+        // ───── 6. 镜头畸变校正 ─────
         if device.isGeometricDistortionCorrectionSupported {
             device.isGeometricDistortionCorrectionEnabled = true
         }
