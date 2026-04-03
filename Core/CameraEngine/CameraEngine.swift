@@ -189,21 +189,25 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             // 后摄拍照
             if let backOutput = self.backPhotoOutput {
                 let settings = AVCapturePhotoSettings()
-                settings.maxPhotoDimensions = backOutput.maxPhotoDimensions
-                if backOutput.availablePhotoCodecTypes.contains(.hevc) {
-                    settings.photoQualityPrioritization = .quality
-                }
+                settings.photoQualityPrioritization = .balanced
                 backOutput.capturePhoto(with: settings, delegate: self)
             }
 
             // 前摄拍照
             if let frontOutput = self.frontPhotoOutput {
                 let settings = AVCapturePhotoSettings()
-                settings.maxPhotoDimensions = frontOutput.maxPhotoDimensions
-                if frontOutput.availablePhotoCodecTypes.contains(.hevc) {
-                    settings.photoQualityPrioritization = .quality
-                }
+                settings.photoQualityPrioritization = .balanced
                 frontOutput.capturePhoto(with: settings, delegate: self)
+            }
+
+            // 超时保护：5秒后如果回调没触发，强制返回避免卡死
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                guard let self, self.photoCaptureCompletion != nil else { return }
+                let back = self.capturedBackPhoto
+                let front = self.capturedFrontPhoto
+                let cb = self.photoCaptureCompletion
+                self.photoCaptureCompletion = nil
+                cb?(back, front)
             }
         }
     }
