@@ -438,6 +438,8 @@ struct CameraView: View {
         HStack(spacing: 32) {
             ForEach(ShootingMode.allCases, id: \.self) { mode in
                 Button {
+                    // 录制中不允许切换拍照/录像模式
+                    guard !viewModel.isRecording else { return }
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         viewModel.setShootingMode(mode)
                         // 切到视频模式时，非 Pro 用户回退 PiP 和合拍
@@ -462,6 +464,7 @@ struct CameraView: View {
                             .frame(width: 5, height: 5)
                     }
                 }
+                .opacity(viewModel.isRecording && viewModel.shootingMode != mode ? 0.3 : 1)
             }
         }
     }
