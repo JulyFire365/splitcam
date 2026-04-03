@@ -388,7 +388,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                     }
                 }
 
-                configureDevice(frontCamera, resolution: resolution)
+                configureDevice(frontCamera, resolution: resolution, isFrontCamera: true)
 
                 // 前摄 Photo Output（ISP 管线拍照）
                 let frontPhoto = AVCapturePhotoOutput()
@@ -431,38 +431,38 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         }
     }
 
-    private func configureDevice(_ device: AVCaptureDevice, resolution: CaptureResolution) {
+    private func configureDevice(_ device: AVCaptureDevice, resolution: CaptureResolution, isFrontCamera: Bool = false) {
         try? device.lockForConfiguration()
 
         // ───── 1. 智能格式选择 ─────
-        // 优先选 1080p 多摄格式（启动快、功耗低），不盲目选最高分辨率
         let multiCamFormats = device.formats.filter { $0.isMultiCamSupported }
 
-        // 目标：1920x1080 附近的格式（宽度 1080~1920）
-        let targetWidth: Int32 = 1920
-        let targetHeight: Int32 = 1080
-
-        // 先找 1080p 格式
-        let preferred = multiCamFormats.filter {
-            let d = CMVideoFormatDescriptionGetDimensions($0.formatDescription)
-            return d.width >= targetHeight && d.width <= targetWidth && d.height >= targetHeight
-        }.sorted { a, b in
-            let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
-            let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
-            // 优先选接近 1080p 的
-            let diffA = abs(Int(da.width) - Int(targetWidth)) + abs(Int(da.height) - Int(targetHeight))
-            let diffB = abs(Int(db.width) - Int(targetWidth)) + abs(Int(db.height) - Int(targetHeight))
-            return diffA < diffB
+        let bestFormat: AVCaptureDevice.Format?
+        if isFrontCamera {
+            // 前摄：选 1080p 格式（前摄本身分辨率有限，选 1080p 即可）
+            let targetWidth: Int32 = 1920
+            let targetHeight: Int32 = 1080
+            let preferred = multiCamFormats.filter {
+                let d = CMVideoFormatDescriptionGetDimensions($0.formatDescription)
+                return d.width >= targetHeight && d.width <= targetWidth && d.height >= targetHeight
+            }.sorted { a, b in
+                let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
+                let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
+                let diffA = abs(Int(da.width) - Int(targetWidth)) + abs(Int(da.height) - Int(targetHeight))
+                let diffB = abs(Int(db.width) - Int(targetWidth)) + abs(Int(db.height) - Int(targetHeight))
+                return diffA < diffB
+            }
+            bestFormat = preferred.first ?? multiCamFormats.first
+        } else {
+            // 后摄：选最高分辨率多摄格式（提升画质）
+            bestFormat = multiCamFormats.sorted { a, b in
+                let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
+                let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
+                return Int(da.width) * Int(da.height) > Int(db.width) * Int(db.height)
+            }.first
         }
 
-        // 如果没有 1080p，回退到最高分辨率
-        let fallback = multiCamFormats.sorted { a, b in
-            let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription)
-            let db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
-            return Int(da.width) * Int(da.height) > Int(db.width) * Int(db.height)
-        }
-
-        if let bestFormat = preferred.first ?? fallback.first {
+        if let bestFormat {
             device.activeFormat = bestFormat
 
             // 设置帧率 30fps

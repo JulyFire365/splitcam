@@ -348,17 +348,24 @@ final class CameraViewModel: ObservableObject {
 
     // MARK: - Photo Capture
 
+    private var isCapturingPhoto = false
+
     private func capturePhoto() {
+        // 防止连续拍照声音踩踏
+        guard !isCapturingPhoto else { return }
+        isCapturingPhoto = true
+
         showFlashEffect = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             self.showFlashEffect = false
         }
 
-        // 使用 ISP 管线拍照（Deep Fusion / Smart HDR）
+        // 使用 ISP 管线拍照
         cameraEngine.capturePhotoWithISP { [weak self] backPhoto, frontPhoto in
             guard let self else { return }
             Task { @MainActor in
                 self.processISPPhotos(backPhoto: backPhoto, frontPhoto: frontPhoto)
+                self.isCapturingPhoto = false
             }
         }
     }
