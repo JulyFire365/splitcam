@@ -224,30 +224,14 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
     // MARK: - Zoom
 
-    /// 当前用于后摄的分辨率（切换镜头时需要）
-    private var currentResolution: CaptureResolution = .hd1080p
-
     func setZoom(_ level: ZoomLevel) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             guard let device = self.backDeviceInput?.device else { return }
+
+            // 主摄: 1.0=1x, 3.0=3x, 0.5x 不支持（minZoomFactor 通常是 1.0）
+            // 超广角: 1.0=0.5x, 2.0=1x, 6.0=3x
             let isUltraWide = device.deviceType == .builtInUltraWideCamera
-
-            // 判断是否需要切换物理镜头
-            let needUltraWide = (level == .ultraWide)
-            let needSwitch = (needUltraWide && !isUltraWide) || (!needUltraWide && isUltraWide)
-
-            if needSwitch {
-                let targetType: AVCaptureDevice.DeviceType = needUltraWide
-                    ? .builtInUltraWideCamera : .builtInWideAngleCamera
-                if let newCamera = AVCaptureDevice.default(targetType, for: .video, position: .back) {
-                    self.switchBackCamera(to: newCamera, zoomLevel: level)
-                    return
-                }
-                // 目标镜头不可用，回退到数码变焦
-            }
-
-            // 同一镜头内的数码变焦
             let factor: CGFloat
             if isUltraWide {
                 switch level {
@@ -277,94 +261,6 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         }
     }
 
-    /// 热切换后摄物理镜头（在 sessionQueue 上调用）
-    private func switchBackCamera(to newCamera: AVCaptureDevice, zoomLevel: ZoomLevel) {
-        multiCamSession.beginConfiguration()
-
-        // 移除旧的后摄 input、video connection、photo output
-        if let oldInput = backDeviceInput {
-            multiCamSession.removeInput(oldInput)
-        }
-        if let oldVideoOutput = backVideoOutput {
-            // 移除连接但保留 output（复用）
-            if let conn = backConnection {
-                multiCamSession.removeConnection(conn)
-                backConnection = nil
-            }
-        }
-        if let oldPhotoOutput = backPhotoOutput {
-            multiCamSession.removeOutput(oldPhotoOutput)
-            backPhotoOutput = nil
-        }
-
-        // 添加新的后摄 input
-        do {
-            let newInput = try AVCaptureDeviceInput(device: newCamera)
-            if multiCamSession.canAddInput(newInput) {
-                multiCamSession.addInputWithNoConnections(newInput)
-                backDeviceInput = newInput
-            }
-
-            // 重建 video connection（复用已有的 output）
-            if let output = backVideoOutput,
-               let inputPort = newInput.ports(for: .video, sourceDeviceType: newCamera.deviceType, sourceDevicePosition: .back).first {
-                let connection = AVCaptureConnection(inputPorts: [inputPort], output: output)
-                if multiCamSession.canAddConnection(connection) {
-                    multiCamSession.addConnection(connection)
-                    backConnection = connection
-                    connection.videoOrientation = .portrait
-                    configureStabilization(for: connection)
-                }
-            }
-
-            // 重建 photo output + connection
-            let newPhoto = AVCapturePhotoOutput()
-            newPhoto.maxPhotoQualityPrioritization = .balanced
-            if multiCamSession.canAddOutput(newPhoto) {
-                multiCamSession.addOutputWithNoConnections(newPhoto)
-                if let photoPort = newInput.ports(for: .video, sourceDeviceType: newCamera.deviceType, sourceDevicePosition: .back).first {
-                    let photoConn = AVCaptureConnection(inputPorts: [photoPort], output: newPhoto)
-                    if multiCamSession.canAddConnection(photoConn) {
-                        multiCamSession.addConnection(photoConn)
-                        photoConn.videoOrientation = .portrait
-                    }
-                }
-                backPhotoOutput = newPhoto
-            }
-
-            configureDevice(newCamera, resolution: currentResolution)
-
-            // 设置变焦
-            let isUltraWide = newCamera.deviceType == .builtInUltraWideCamera
-            let factor: CGFloat
-            if isUltraWide {
-                switch zoomLevel {
-                case .ultraWide:  factor = 1.0
-                case .wide:       factor = 2.0
-                case .telephoto:  factor = 6.0
-                }
-            } else {
-                switch zoomLevel {
-                case .ultraWide:  factor = newCamera.minAvailableVideoZoomFactor
-                case .wide:       factor = 1.0
-                case .telephoto:  factor = 3.0
-                }
-            }
-            try? newCamera.lockForConfiguration()
-            newCamera.videoZoomFactor = min(max(factor, newCamera.minAvailableVideoZoomFactor),
-                                            newCamera.maxAvailableVideoZoomFactor)
-            newCamera.unlockForConfiguration()
-        } catch {}
-
-        multiCamSession.commitConfiguration()
-
-        let newIsUltraWide = newCamera.deviceType == .builtInUltraWideCamera
-        DispatchQueue.main.async {
-            self.currentZoom = zoomLevel
-            self.isBackUltraWide = newIsUltraWide
-        }
-    }
-
     // MARK: - Mirror / Flip
 
     func toggleFrontMirror() {
@@ -385,7 +281,6 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     // MARK: - Session Configuration
 
     private func configureSession(resolution: CaptureResolution) {
-        currentResolution = resolution
         guard AVCaptureMultiCamSession.isMultiCamSupported else {
             DispatchQueue.main.async {
                 self.error = .multiCamNotSupported

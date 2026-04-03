@@ -328,9 +328,17 @@ struct CameraView: View {
 
     // MARK: - Zoom Capsule
 
+    private var availableZoomLevels: [ZoomLevel] {
+        if viewModel.cameraEngine.isBackUltraWide {
+            return ZoomLevel.allCases
+        } else {
+            return ZoomLevel.allCases.filter { $0 != .ultraWide }
+        }
+    }
+
     private var zoomCapsule: some View {
         HStack(spacing: 12) {
-            ForEach(ZoomLevel.allCases, id: \.rawValue) { level in
+            ForEach(availableZoomLevels, id: \.rawValue) { level in
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         viewModel.setZoom(level)
