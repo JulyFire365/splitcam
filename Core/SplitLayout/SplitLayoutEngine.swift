@@ -141,7 +141,7 @@ struct BorderStyleConfig: Equatable {
     var color: Color
     var width: CGFloat
 
-    static let `default` = BorderStyleConfig(style: .thin, color: .white, width: 1.5)
+    static let `default` = BorderStyleConfig(style: .thin, color: .white, width: 0.5)
 
     var cgColor: CGColor {
         UIColor(color).cgColor
