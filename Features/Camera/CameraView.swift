@@ -224,8 +224,10 @@ struct CameraView: View {
                     .transition(.opacity.combined(with: .scale))
             }
 
-            // 变焦胶囊
-            zoomCapsule
+            // 变焦胶囊（合拍模式下隐藏，后摄被导入内容替代）
+            if !viewModel.isDuetMode {
+                zoomCapsule
+            }
 
             // 功能按钮行：交换 + 拍摄按钮 + 镜像
             captureRow
