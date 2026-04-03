@@ -327,7 +327,7 @@ struct CameraView: View {
     // MARK: - Zoom Capsule
 
     private var zoomCapsule: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 12) {
             ForEach(ZoomLevel.allCases, id: \.rawValue) { level in
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -335,10 +335,10 @@ struct CameraView: View {
                     }
                 } label: {
                     Text(level.label)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(viewModel.zoomLevel == level ? .yellow : .white.opacity(0.7))
-                        .frame(width: viewModel.zoomLevel == level ? 40 : 34,
-                               height: viewModel.zoomLevel == level ? 40 : 34)
+                        .frame(width: viewModel.zoomLevel == level ? 32 : 28,
+                               height: viewModel.zoomLevel == level ? 32 : 28)
                         .background(
                             Circle()
                                 .fill(viewModel.zoomLevel == level
@@ -349,7 +349,8 @@ struct CameraView: View {
                 }
             }
         }
-        .padding(4)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
         .background(Capsule().fill(.ultraThinMaterial).environment(\.colorScheme, .dark))
     }
 
