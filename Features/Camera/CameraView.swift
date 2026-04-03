@@ -329,7 +329,8 @@ struct CameraView: View {
     // MARK: - Zoom Capsule
 
     private var availableZoomLevels: [ZoomLevel] {
-        if viewModel.cameraEngine.isBackUltraWide {
+        // 设备有超广角摄像头就显示 0.5x（动态切换镜头）
+        if CameraEngine.hasUltraWideCamera {
             return ZoomLevel.allCases
         } else {
             return ZoomLevel.allCases.filter { $0 != .ultraWide }

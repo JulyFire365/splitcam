@@ -222,6 +222,16 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         return UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
     }
 
+    // MARK: - Device Capability
+
+    /// 设备是否有超广角后摄（决定 UI 是否显示 0.5x）
+    static var hasUltraWideCamera: Bool {
+        AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil
+    }
+
+    /// 标记是否正在切换镜头，防止重入
+    private var isSwitchingLens = false
+
     // MARK: - Zoom
 
     func setZoom(_ level: ZoomLevel) {
@@ -229,36 +239,217 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             guard let self else { return }
             guard let device = self.backDeviceInput?.device else { return }
 
-            // 主摄: 1.0=1x, 3.0=3x, 0.5x 不支持（minZoomFactor 通常是 1.0）
-            // 超广角: 1.0=0.5x, 2.0=1x, 6.0=3x
-            let isUltraWide = device.deviceType == .builtInUltraWideCamera
-            let factor: CGFloat
-            if isUltraWide {
-                switch level {
-                case .ultraWide:  factor = 1.0
-                case .wide:       factor = 2.0
-                case .telephoto:  factor = 6.0
-                }
-            } else {
-                switch level {
-                case .ultraWide:  factor = device.minAvailableVideoZoomFactor
-                case .wide:       factor = 1.0
-                case .telephoto:  factor = 3.0
+            let currentIsUltraWide = device.deviceType == .builtInUltraWideCamera
+            let needsUltraWide = (level == .ultraWide)
+
+            // 录制中不切换镜头（会导致帧丢失）
+            if needsUltraWide != currentIsUltraWide && !self.isRecording {
+                let switched = self.switchBackCameraLens(toUltraWide: needsUltraWide)
+                if !switched && needsUltraWide {
+                    // 切换失败，不做任何操作
+                    print("[CameraEngine] Lens switch failed, staying on current lens")
+                    return
                 }
             }
 
-            let clamped = min(max(factor, device.minAvailableVideoZoomFactor),
-                              device.maxAvailableVideoZoomFactor)
+            // 切换后重新获取 device
+            guard let currentDevice = self.backDeviceInput?.device else { return }
+            let isUltraWide = currentDevice.deviceType == .builtInUltraWideCamera
+
+            let factor: CGFloat
+            if isUltraWide {
+                switch level {
+                case .ultraWide:  factor = 1.0   // 超广角原生 0.5x
+                case .wide:       factor = 2.0   // 数码变焦到 1x
+                case .telephoto:  factor = 6.0   // 数码变焦到 3x
+                }
+            } else {
+                switch level {
+                case .ultraWide:  factor = 1.0   // 不应到达此分支
+                case .wide:       factor = 1.0   // 主摄原生 1x
+                case .telephoto:  factor = 3.0   // 数码变焦到 3x
+                }
+            }
+
+            let clamped = min(max(factor, currentDevice.minAvailableVideoZoomFactor),
+                              currentDevice.maxAvailableVideoZoomFactor)
             do {
-                try device.lockForConfiguration()
-                device.videoZoomFactor = clamped
-                device.unlockForConfiguration()
-            } catch {}
+                try currentDevice.lockForConfiguration()
+                currentDevice.videoZoomFactor = clamped
+                currentDevice.unlockForConfiguration()
+            } catch {
+                print("[CameraEngine] Failed to set zoom: \(error)")
+            }
 
             DispatchQueue.main.async {
                 self.currentZoom = level
             }
         }
+    }
+
+    // MARK: - Dynamic Lens Switch (安全热切换)
+
+    /// 安全切换后摄镜头：主摄 ↔ 超广角
+    /// 全程在 beginConfiguration/commitConfiguration 内，失败自动回滚
+    /// - Returns: 是否切换成功
+    private func switchBackCameraLens(toUltraWide: Bool) -> Bool {
+        guard !isSwitchingLens else { return false }
+        isSwitchingLens = true
+        defer { isSwitchingLens = false }
+
+        let targetType: AVCaptureDevice.DeviceType = toUltraWide ? .builtInUltraWideCamera : .builtInWideAngleCamera
+
+        // 1. 已经是目标镜头
+        guard let currentInput = backDeviceInput,
+              currentInput.device.deviceType != targetType else { return true }
+
+        // 2. 查找目标设备
+        guard let targetDevice = AVCaptureDevice.default(targetType, for: .video, position: .back) else {
+            print("[CameraEngine] Target device not found: \(targetType)")
+            return false
+        }
+
+        // 3. 预检查多摄格式
+        let multiCamFormats = targetDevice.formats.filter { $0.isMultiCamSupported }
+        guard !multiCamFormats.isEmpty else {
+            print("[CameraEngine] No multi-cam formats for target device")
+            return false
+        }
+
+        // 4. 预创建新 Input（在修改 session 之前）
+        let newInput: AVCaptureDeviceInput
+        do {
+            newInput = try AVCaptureDeviceInput(device: targetDevice)
+        } catch {
+            print("[CameraEngine] Failed to create input: \(error)")
+            return false
+        }
+
+        // 5. 保存回滚状态
+        let oldInput = currentInput
+
+        multiCamSession.beginConfiguration()
+
+        // 6. 移除旧的后摄连接（仅后摄，保留前摄）
+        let connectionsToRemove = multiCamSession.connections.filter { conn in
+            conn.inputPorts.contains { $0.sourceDevicePosition == .back }
+        }
+        for conn in connectionsToRemove {
+            multiCamSession.removeConnection(conn)
+        }
+        backConnection = nil
+
+        // 7. 移除旧 Photo Output（需重建）
+        if let oldPhoto = backPhotoOutput {
+            multiCamSession.removeOutput(oldPhoto)
+            backPhotoOutput = nil
+        }
+
+        // 8. 移除旧 Input
+        multiCamSession.removeInput(oldInput)
+
+        // 9. 尝试添加新 Input
+        guard multiCamSession.canAddInput(newInput) else {
+            print("[CameraEngine] Cannot add new input, rolling back")
+            rollbackBackCamera(oldInput: oldInput)
+            multiCamSession.commitConfiguration()
+            return false
+        }
+
+        multiCamSession.addInputWithNoConnections(newInput)
+        backDeviceInput = newInput
+
+        // 10. 重建视频连接
+        guard let videoPort = newInput.ports(for: .video, sourceDeviceType: targetDevice.deviceType, sourceDevicePosition: .back).first,
+              let videoOutput = backVideoOutput else {
+            print("[CameraEngine] Cannot get video port, rolling back")
+            multiCamSession.removeInput(newInput)
+            rollbackBackCamera(oldInput: oldInput)
+            multiCamSession.commitConfiguration()
+            return false
+        }
+
+        let videoConn = AVCaptureConnection(inputPorts: [videoPort], output: videoOutput)
+        guard multiCamSession.canAddConnection(videoConn) else {
+            print("[CameraEngine] Cannot add video connection, rolling back")
+            multiCamSession.removeInput(newInput)
+            rollbackBackCamera(oldInput: oldInput)
+            multiCamSession.commitConfiguration()
+            return false
+        }
+
+        multiCamSession.addConnection(videoConn)
+        backConnection = videoConn
+        videoConn.videoOrientation = .portrait
+        configureStabilization(for: videoConn)
+
+        // 11. 重建 Photo Output + 连接
+        let newPhoto = AVCapturePhotoOutput()
+        newPhoto.maxPhotoQualityPrioritization = .balanced
+        if multiCamSession.canAddOutput(newPhoto) {
+            multiCamSession.addOutputWithNoConnections(newPhoto)
+            if let photoPort = newInput.ports(for: .video, sourceDeviceType: targetDevice.deviceType, sourceDevicePosition: .back).first {
+                let photoConn = AVCaptureConnection(inputPorts: [photoPort], output: newPhoto)
+                if multiCamSession.canAddConnection(photoConn) {
+                    multiCamSession.addConnection(photoConn)
+                    photoConn.videoOrientation = .portrait
+                }
+            }
+            backPhotoOutput = newPhoto
+        }
+
+        // 12. 配置设备格式（分辨率、帧率等）
+        configureDevice(targetDevice, resolution: .hd1080p)
+
+        multiCamSession.commitConfiguration()
+
+        let isUW = toUltraWide
+        DispatchQueue.main.async { self.isBackUltraWide = isUW }
+
+        print("[CameraEngine] Lens switch successful: \(toUltraWide ? "ultra-wide" : "wide-angle")")
+        return true
+    }
+
+    /// 回滚：恢复旧的后摄 Input + 连接
+    private func rollbackBackCamera(oldInput: AVCaptureDeviceInput) {
+        guard multiCamSession.canAddInput(oldInput) else {
+            print("[CameraEngine] CRITICAL: Cannot rollback camera input!")
+            return
+        }
+
+        multiCamSession.addInputWithNoConnections(oldInput)
+        backDeviceInput = oldInput
+
+        let deviceType = oldInput.device.deviceType
+
+        // 恢复视频连接
+        if let port = oldInput.ports(for: .video, sourceDeviceType: deviceType, sourceDevicePosition: .back).first,
+           let videoOutput = backVideoOutput {
+            let conn = AVCaptureConnection(inputPorts: [port], output: videoOutput)
+            if multiCamSession.canAddConnection(conn) {
+                multiCamSession.addConnection(conn)
+                backConnection = conn
+                conn.videoOrientation = .portrait
+                configureStabilization(for: conn)
+            }
+        }
+
+        // 恢复 Photo Output
+        let photo = AVCapturePhotoOutput()
+        photo.maxPhotoQualityPrioritization = .balanced
+        if multiCamSession.canAddOutput(photo) {
+            multiCamSession.addOutputWithNoConnections(photo)
+            if let photoPort = oldInput.ports(for: .video, sourceDeviceType: deviceType, sourceDevicePosition: .back).first {
+                let photoConn = AVCaptureConnection(inputPorts: [photoPort], output: photo)
+                if multiCamSession.canAddConnection(photoConn) {
+                    multiCamSession.addConnection(photoConn)
+                    photoConn.videoOrientation = .portrait
+                }
+            }
+            backPhotoOutput = photo
+        }
+
+        print("[CameraEngine] Rollback successful")
     }
 
     // MARK: - Mirror / Flip
