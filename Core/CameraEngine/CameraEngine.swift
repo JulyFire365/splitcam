@@ -12,6 +12,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     @Published var recordingDuration: TimeInterval = 0
     @Published var error: CameraError?
     @Published var currentZoom: ZoomLevel = .wide
+    @Published var isBackUltraWide = false
 
     // MARK: - Capture Session
 
@@ -295,10 +296,10 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             multiCamSession.removeOutput(output)
         }
 
-        // Setup back camera — prefer ultra-wide for 0.5x/1x/3x zoom support
+        // Setup back camera — prefer wide-angle (主摄) for best image quality
         let backCamera: AVCaptureDevice? =
-            AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
-            ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+            AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
         if let backCamera {
             do {
                 let input = try AVCaptureDeviceInput(device: backCamera)
@@ -330,7 +331,11 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
 
                 configureDevice(backCamera, resolution: resolution)
 
-                // Default to 1x (wide) zoom — on ultra-wide this is factor 2.0
+                // 标记后摄镜头类型
+                let backIsUltraWide = backCamera.deviceType == .builtInUltraWideCamera
+                DispatchQueue.main.async { self.isBackUltraWide = backIsUltraWide }
+
+                // Default zoom: wide-angle = 1.0 (原生1x), ultra-wide = 2.0 (模拟1x)
                 if backCamera.deviceType == .builtInUltraWideCamera {
                     try? backCamera.lockForConfiguration()
                     let wide = min(2.0, backCamera.maxAvailableVideoZoomFactor)
