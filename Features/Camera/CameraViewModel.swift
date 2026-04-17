@@ -878,9 +878,12 @@ final class CameraViewModel: ObservableObject {
         }
 
         writerRef.finishWriting { [weak self] in
+            // 注意：AVAssetWriter 不是 Sendable；不要把 writerRef 捕获进 @Sendable 闭包。
+            // 等跨到主线程后再通过 self.composedWriter 读状态（同一对象，线程安全）。
             guard let self else { return }
             DispatchQueue.main.async {
-                if writerRef.status == .completed {
+                let didComplete = self.composedWriter?.status == .completed
+                if didComplete {
                     // 生成缩略图
                     Task {
                         let asset = AVURLAsset(url: outputURL)

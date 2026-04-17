@@ -1,4 +1,7 @@
-import AVFoundation
+// @preconcurrency：iOS 18 SDK 把 AVVideoCompositionInstructionProtocol 标成 Sendable，
+// 并把 AVVideoCompositing 的两个 attributes 字典值类型收紧为 Sendable。iOS 17 SDK 不是。
+// 用模块级 preconcurrency import 抹掉新增的 Sendable 约束，保持双 SDK 构建兼容。
+@preconcurrency import AVFoundation
 import CoreImage
 import UIKit
 
