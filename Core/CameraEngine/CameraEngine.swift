@@ -37,6 +37,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     private var capturedBackPhoto: UIImage?
     private var capturedFrontPhoto: UIImage?
     private var photoCaptureCount = 0
+    private var photoCaptureExpected = 0
 
     // Audio
     private var audioDeviceInput: AVCaptureDeviceInput?
@@ -173,6 +174,9 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
     // MARK: - Photo Capture (系统 ISP 管线)
 
     /// 使用 AVCapturePhotoOutput 拍照（Deep Fusion / Smart HDR）
+    /// 只走后摄 ISP 管线触发一次系统快门声。iOS 无法关闭 capturePhoto 的系统快门音，
+    /// 同时对前后两个 output 调用会产生双击声，快速连拍时多对声音叠加非常明显。
+    /// 前摄图像由 VideoDataOutput 的最近一帧提供（CameraViewModel 已实现该降级路径）。
     func capturePhotoWithISP(completion: @escaping (UIImage?, UIImage?) -> Void) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
@@ -180,26 +184,18 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             self.capturedBackPhoto = nil
             self.capturedFrontPhoto = nil
             self.photoCaptureCount = 0
+            self.photoCaptureExpected = 0
 
-            let totalCaptures = (self.backPhotoOutput != nil ? 1 : 0) + (self.frontPhotoOutput != nil ? 1 : 0)
-            guard totalCaptures > 0 else {
+            guard let backOutput = self.backPhotoOutput else {
+                // 无后摄 output，整个 ISP 路径失败，让上层降级处理两个方向的 frameBuffer
                 DispatchQueue.main.async { completion(nil, nil) }
                 return
             }
 
-            // 后摄拍照
-            if let backOutput = self.backPhotoOutput {
-                let settings = AVCapturePhotoSettings()
-                settings.photoQualityPrioritization = .balanced
-                backOutput.capturePhoto(with: settings, delegate: self)
-            }
-
-            // 前摄拍照
-            if let frontOutput = self.frontPhotoOutput {
-                let settings = AVCapturePhotoSettings()
-                settings.photoQualityPrioritization = .balanced
-                frontOutput.capturePhoto(with: settings, delegate: self)
-            }
+            self.photoCaptureExpected = 1
+            let settings = AVCapturePhotoSettings()
+            settings.photoQualityPrioritization = .balanced
+            backOutput.capturePhoto(with: settings, delegate: self)
 
             // 超时保护：5秒后如果回调没触发，强制返回避免卡死
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
@@ -919,8 +915,7 @@ extension CameraEngine: AVCapturePhotoCaptureDelegate {
         }
         photoCaptureCount += 1
 
-        let totalExpected = (backPhotoOutput != nil ? 1 : 0) + (frontPhotoOutput != nil ? 1 : 0)
-        if photoCaptureCount >= totalExpected {
+        if photoCaptureCount >= photoCaptureExpected {
             let back = capturedBackPhoto
             let front = capturedFrontPhoto
             let completion = photoCaptureCompletion
