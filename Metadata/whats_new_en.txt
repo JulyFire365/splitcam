@@ -1,0 +1,8 @@
+Bug fixes and stability improvements:
+
+- Picture-in-Picture: the small window now appears in the exact same position in your saved photo or video as it did in the live preview. Previously the exported position could drift, especially after you dragged the window.
+- Video recording: removed a false "save failed" alert that occasionally appeared if you tapped stop right after start.
+- Photo capture: the shutter sound no longer doubles or overlaps when tapping the capture button rapidly.
+- Internal improvements for iOS 18 compatibility.
+
+Thanks for using SplitCam!
