@@ -12,10 +12,18 @@ final class SplitLayoutEngine: ObservableObject {
     // PiP 相关状态
     @Published var pipShape: PipShape = .roundedRect
     @Published var pipScale: CGFloat = 0.3        // 小窗口占屏幕宽度的比例 (0.2~0.5)
-    @Published var pipOffset: CGSize = .zero       // 小窗口相对默认位置(右上角)的偏移
+    /// 小窗口相对默认位置(右上角)的偏移。
+    /// width = 水平偏移 / 容器宽, height = 垂直偏移 / 容器高。
+    /// 存归一化分数，保证预览和导出用相同数值得到相同相对位置。
+    @Published var pipOffset: CGSize = .zero
 
     static let pipMinScale: CGFloat = 0.2
     static let pipMaxScale: CGFloat = 0.5
+
+    /// PiP 四周的边缘留白，占容器宽的比例（≈16pt / 393pt 预览宽）
+    static let pipEdgeMarginFraction: CGFloat = 0.04
+    /// 默认顶部留空，占容器高的比例（≈66pt / 852pt 预览高，给顶部控制栏让位）
+    static let pipDefaultTopFraction: CGFloat = 0.08
 
     // MARK: - Constraints
 
@@ -62,22 +70,31 @@ final class SplitLayoutEngine: ObservableObject {
 
     /// 画中画小窗口的 frame
     func pipRect(in containerSize: CGSize) -> CGRect {
-        let clampedScale = min(Self.pipMaxScale, max(Self.pipMinScale, pipScale))
+        Self.pipRect(in: containerSize, scale: pipScale, offset: pipOffset)
+    }
+
+    /// 画中画小窗口的 frame — 无状态版本。
+    /// 录制路径在 dataOutputQueue 上以快照值调用，避免跨线程读 @Published 状态。
+    /// 所有常量均为容器尺寸的分数，因此预览（屏幕点）和导出（像素画布）会得到
+    /// 一致的相对位置。
+    static func pipRect(in containerSize: CGSize, scale: CGFloat, offset: CGSize) -> CGRect {
+        let clampedScale = min(pipMaxScale, max(pipMinScale, scale))
         let pipWidth = containerSize.width * clampedScale
         let pipHeight = pipWidth * (4.0 / 3.0) // 4:3 比例小窗口
 
-        let margin: CGFloat = 16
+        let edgeX = containerSize.width * pipEdgeMarginFraction
+        let edgeY = containerSize.height * pipEdgeMarginFraction
         // 默认右上角位置
-        let defaultX = containerSize.width - pipWidth - margin
-        let defaultY = margin + 50 // 留出顶部控制栏空间
+        let defaultX = containerSize.width - pipWidth - edgeX
+        let defaultY = containerSize.height * pipDefaultTopFraction
 
-        // 加上用户拖拽偏移
-        var x = defaultX + pipOffset.width
-        var y = defaultY + pipOffset.height
+        // offset 是归一化分数：dx / 容器宽, dy / 容器高
+        var x = defaultX + offset.width * containerSize.width
+        var y = defaultY + offset.height * containerSize.height
 
-        // 限制在屏幕范围内
-        x = max(margin, min(containerSize.width - pipWidth - margin, x))
-        y = max(margin, min(containerSize.height - pipHeight - margin, y))
+        // 限制在容器范围内
+        x = max(edgeX, min(containerSize.width - pipWidth - edgeX, x))
+        y = max(edgeY, min(containerSize.height - pipHeight - edgeY, y))
 
         return CGRect(x: x, y: y, width: pipWidth, height: pipHeight)
     }

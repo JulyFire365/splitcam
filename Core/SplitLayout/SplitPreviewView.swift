@@ -117,9 +117,12 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                         pipDragStartOffset = layout.pipOffset
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
+                    // pipOffset 为相对容器宽/高的归一化分数；预览和导出用同一数值得到相同相对位置。
+                    let safeWidth = max(containerSize.width, 1)
+                    let safeHeight = max(containerSize.height, 1)
                     layout.pipOffset = CGSize(
-                        width: pipDragStartOffset.width + value.translation.width,
-                        height: pipDragStartOffset.height + value.translation.height
+                        width: pipDragStartOffset.width + value.translation.width / safeWidth,
+                        height: pipDragStartOffset.height + value.translation.height / safeHeight
                     )
                     dismissHint()
                 }

@@ -685,20 +685,14 @@ final class CameraViewModel: ObservableObject {
         let currentPipOffset = recPipOffset
         let currentBorderStyle = recBorderStyle
 
-        // 计算目标区域
+        // 计算目标区域 — 用 SplitLayoutEngine 的静态方法保证预览与录制几何一致
         let frames: (first: CGRect, second: CGRect)
         if currentSplitMode == .pip {
-            // 临时 layout engine 计算 PiP rect
-            let pipWidth = currentOutputSize.width * currentPipScale
-            let pipHeight = pipWidth * (4.0 / 3.0)
-            let margin: CGFloat = 16
-            let defaultX = currentOutputSize.width - pipWidth - margin
-            let defaultY = margin + 50
-            var x = defaultX + currentPipOffset.width
-            var y = defaultY + currentPipOffset.height
-            x = max(margin, min(currentOutputSize.width - pipWidth - margin, x))
-            y = max(margin, min(currentOutputSize.height - pipHeight - margin, y))
-            let pipRect = CGRect(x: x, y: y, width: pipWidth, height: pipHeight)
+            let pipRect = SplitLayoutEngine.pipRect(
+                in: currentOutputSize,
+                scale: currentPipScale,
+                offset: currentPipOffset
+            )
             frames = (CGRect(origin: .zero, size: currentOutputSize), pipRect)
         } else {
             let bw = currentBorderStyle.style != .none ? currentBorderStyle.width : 0
@@ -870,6 +864,18 @@ final class CameraViewModel: ObservableObject {
 
         guard let writer = composedWriter, let outputURL = composedOutputURL else { return }
         let writerRef = writer
+
+        // 如果从未推入过任何帧（startSession 未调用），finishWriting 会变成 .failed，
+        // 触发"保存失败"误报。直接取消并静默丢弃。
+        if !isWritingStarted {
+            writerRef.cancelWriting()
+            composedWriter = nil
+            composedVideoInput = nil
+            composedAudioInput = nil
+            pixelBufferAdaptor = nil
+            recordingStartTime = nil
+            return
+        }
 
         writerRef.finishWriting { [weak self] in
             guard let self else { return }
