@@ -206,7 +206,9 @@ struct ExportView: View {
             ShareSheet(items: [url])
         }
         .alert("已保存", isPresented: $viewModel.showSaveSuccess) {
-            Button("好的") {}
+            Button("好的") {
+                ReviewPromptManager.shared.queueAfterSuccessfulVideoExport()
+            }
         } message: {
             Text("视频已保存到相册")
         }

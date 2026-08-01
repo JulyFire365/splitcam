@@ -159,8 +159,8 @@ struct CameraView: View {
         VStack(spacing: 0) {
             // 渐变遮罩背景
             HStack(alignment: .center) {
-                // 左: 导入按钮 (合拍，视频模式需要 Pro)
-                toolButton(icon: "photo.badge.plus") {
+                // 左: 导入按钮（合拍，视频模式需要 Pro）
+                toolButton(icon: "photo.badge.plus", showsProBadge: isVideoProFeatureLocked) {
                     if viewModel.shootingMode == .video && !subscriptionManager.isPro {
                         paywallTrigger = .duetMode
                         showPaywall = true
@@ -272,12 +272,10 @@ struct CameraView: View {
                                     .fill(viewModel.splitMode == splitMode ? .white.opacity(0.25) : .clear)
                             )
 
-                        // Pro 锁标（仅视频模式显示）
-                        if splitMode == .pip && !subscriptionManager.isPro && viewModel.shootingMode == .video {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 7))
-                                .foregroundColor(.orange)
-                                .offset(x: -2, y: 4)
+                        // 视频模式下的 Pro 功能标识
+                        if splitMode == .pip && isVideoProFeatureLocked {
+                            proBadge
+                                .offset(x: 2, y: -3)
                         }
                     }
                 }
@@ -551,16 +549,74 @@ struct CameraView: View {
         }
     }
 
+    // MARK: - Pro Feature Indicator
+
+    private var isVideoProFeatureLocked: Bool {
+        viewModel.shootingMode == .video && !subscriptionManager.isPro
+    }
+
+    /// 统一的 Pro 胶囊标识：深色玻璃底搭配香槟金字标，融入相机界面而不显突兀。
+    private var proBadge: some View {
+        Text("PRO")
+            .font(.system(size: 7, weight: .bold, design: .rounded))
+            .tracking(0.45)
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [
+                        Color(red: 1.0, green: 0.92, blue: 0.66),
+                        Color(red: 0.88, green: 0.67, blue: 0.30)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                Capsule()
+                    .fill(.black.opacity(0.48))
+            )
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [.white.opacity(0.48), Color(red: 0.89, green: 0.69, blue: 0.34).opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.75
+                    )
+            )
+            .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
+            .accessibilityLabel("Pro")
+    }
+
     // MARK: - Tool Button (统一圆形按钮风格)
 
-    private func toolButton(icon: String, action: @escaping () -> Void) -> some View {
+    private func toolButton(
+        icon: String,
+        showsProBadge: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(.white.opacity(0.15)))
-                .contentShape(Circle())
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(.white.opacity(0.15)))
+                    .contentShape(Circle())
+
+                if showsProBadge {
+                    proBadge
+                        .offset(x: 4, y: -3)
+                }
+            }
         }
     }
 

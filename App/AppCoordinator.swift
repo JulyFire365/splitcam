@@ -136,30 +136,37 @@ enum ZoomLevel: CGFloat, CaseIterable {
 @MainActor
 final class AppCoordinator: ObservableObject {
     @Published var path = NavigationPath()
+    @Published private(set) var navigationRevision = 0
 
     func navigateToCamera(mode: CaptureMode) {
         path.append(AppRoute.camera(mode))
+        navigationRevision &+= 1
     }
 
     func navigateToEditor(videoA: URL, videoB: URL) {
         path.append(AppRoute.editor(videoA, videoB))
+        navigationRevision &+= 1
     }
 
     func navigateToExport(videoURL: URL) {
         path.append(AppRoute.export(videoURL))
+        navigationRevision &+= 1
     }
 
     func navigateToGallery() {
         path.append(AppRoute.gallery)
+        navigationRevision &+= 1
     }
 
     func popToRoot() {
         path = NavigationPath()
+        navigationRevision &+= 1
     }
 
     func pop() {
         guard !path.isEmpty else { return }
         path.removeLast()
+        navigationRevision &+= 1
     }
 
     @ViewBuilder

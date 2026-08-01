@@ -547,7 +547,12 @@ final class CameraViewModel: ObservableObject {
             guard status == .authorized else { return }
             PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAsset(from: image)
-            } completionHandler: { _, _ in }
+            } completionHandler: { success, _ in
+                guard success else { return }
+                DispatchQueue.main.async {
+                    ReviewPromptManager.shared.recordSuccessfulCreation()
+                }
+            }
         }
     }
 
@@ -556,8 +561,11 @@ final class CameraViewModel: ObservableObject {
             guard status == .authorized else { return }
             PHPhotoLibrary.shared().performChanges {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
-            } completionHandler: { _, _ in
+            } completionHandler: { success, _ in
                 DispatchQueue.main.async {
+                    if success {
+                        ReviewPromptManager.shared.recordSuccessfulCreation()
+                    }
                     self.isProcessing = false
                 }
             }

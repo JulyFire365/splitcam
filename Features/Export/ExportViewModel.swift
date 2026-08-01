@@ -54,6 +54,7 @@ final class ExportViewModel: ObservableObject {
             } completionHandler: { success, error in
                 DispatchQueue.main.async {
                     if success {
+                        ReviewPromptManager.shared.recordSuccessfulCreation()
                         self.showSaveSuccess = true
                     } else {
                         self.state = .failed(error?.localizedDescription ?? "error.saveFailed".localized)

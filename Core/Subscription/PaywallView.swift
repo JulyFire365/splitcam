@@ -266,12 +266,15 @@ struct PaywallView: View {
                         .tint(.white)
                 } else {
                     Text(purchaseButtonText)
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                 }
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(height: 58)
             .background(
                 LinearGradient(
                     colors: [.orange, .pink],
@@ -288,10 +291,16 @@ struct PaywallView: View {
     private var purchaseButtonText: String {
         guard let product = selectedProduct else { return "paywall.selectPlan".localized }
         if let trial = product.freeTrialDays, trial > 0 {
+            if product.id == ProProduct.yearly.rawValue {
+                return "paywall.startYearlyTrial".localized("\(trial)", product.displayPrice)
+            }
             return "paywall.startTrial".localized("\(trial)")
         }
         if product.id == ProProduct.lifetime.rawValue {
             return "paywall.buyNow".localized(product.displayPrice)
+        }
+        if product.id == ProProduct.yearly.rawValue {
+            return "paywall.subscribeYearly".localized(product.displayPrice)
         }
         return "paywall.subscribeNow".localized(product.displayPrice)
     }
