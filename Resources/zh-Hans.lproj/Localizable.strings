@@ -48,8 +48,10 @@
 "paywall.lifetimeDesc" = "一次付费，永久使用";
 "paywall.selectPlan" = "选择方案";
 "paywall.startTrial" = "开始 %@ 天免费试用";
+"paywall.startYearlyTrial" = "免费试用 %@ 天，随后 %@/年自动续订";
 "paywall.buyNow" = "立即购买 %@";
 "paywall.subscribeNow" = "立即订阅 %@";
+"paywall.subscribeYearly" = "订阅 %@/年自动续订";
 "paywall.restore" = "恢复购买";
 "paywall.terms" = "确认购买后，将向您的 Apple ID 账户收取费用。订阅将自动续费，除非在当前订阅期结束前至少 24 小时取消。您的账户将在当前订阅期结束前 24 小时内被收取续费费用。您可以在 App Store 账户设置中管理和取消订阅。";
 "paywall.termsOfUse" = "使用条款";
