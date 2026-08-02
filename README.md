@@ -6,14 +6,6 @@ Built on `AVCaptureMultiCamSession` with two parallel `AVAssetWriter`s and a cus
 
 ---
 
-## Demo
-
-https://github.com/JulyFire365/splitcam/raw/master/demo/demo.mov
-
-> If the player doesn't load inline on your browser, open [`demo/demo.mov`](demo/demo.mov) directly.
-
----
-
 ## Features
 
 - **Dual-camera simultaneous capture** — front + back at the same time
@@ -44,6 +36,7 @@ One-tap install, auto-updates, works on any iPhone.
 Apple lets any Apple ID sideload apps onto personal devices for free. The signature lasts 7 days for a free account (you re-run Xcode once a week), or 1 year if you have a paid Developer account.
 
 **Requirements**
+
 - A Mac with **Xcode 15+**
 - An iPhone running **iOS 16+** (real device — `AVCaptureMultiCamSession` does not work in the Simulator)
 - A free **Apple ID** signed into Xcode (`Xcode → Settings → Accounts`)
@@ -52,12 +45,14 @@ Apple lets any Apple ID sideload apps onto personal devices for free. The signat
 **Steps**
 
 1. Clone the repo
+
    ```sh
    git clone https://github.com/JulyFire365/splitcam.git
    cd splitcam
    ```
 
 2. Open the project
+
    ```sh
    open SplitCam.xcodeproj
    ```
