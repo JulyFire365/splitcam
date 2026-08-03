@@ -178,11 +178,8 @@ struct CameraView: View {
 
                 Spacer()
 
-                // 右: 更多菜单 + 最近拍摄缩略图
-                HStack(spacing: 8) {
-                    moreMenu
-                    lastMediaButton
-                }
+                // 右: 用户保存过作品后再显示评分入口，避免首次打开时出现孤立菜单。
+                mediaActions
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -626,6 +623,19 @@ struct CameraView: View {
 
     // MARK: - Last Media Button
 
+    private var mediaActions: some View {
+        Group {
+            if viewModel.lastSavedThumbnail != nil {
+                HStack(spacing: 8) {
+                    reviewButton
+                    lastMediaButton
+                }
+            } else {
+                Color.clear.frame(width: 40, height: 40)
+            }
+        }
+    }
+
     private var lastMediaButton: some View {
         Group {
             if let lastThumbnail = viewModel.lastSavedThumbnail {
@@ -646,33 +656,14 @@ struct CameraView: View {
         }
     }
 
-    private var moreMenu: some View {
-        Menu {
-            Button {
-                ReviewPromptManager.shared.recordManualReviewIntent()
-                if let reviewURL = URL(string: "https://apps.apple.com/app/id6761194664?action=write-review") {
-                    openURL(reviewURL)
-                }
-            } label: {
-                Label("review.rate".localized, systemImage: "star.bubble")
+    private var reviewButton: some View {
+        toolButton(icon: "star.bubble") {
+            ReviewPromptManager.shared.recordManualReviewIntent()
+            if let reviewURL = URL(string: "https://apps.apple.com/app/id6761194664?action=write-review") {
+                openURL(reviewURL)
             }
-
-            Button {
-                Task {
-                    await subscriptionManager.restorePurchases()
-                }
-            } label: {
-                Label("paywall.restore".localized, systemImage: "arrow.clockwise")
-            }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(.white.opacity(0.15)))
-                .contentShape(Circle())
         }
-        .accessibilityLabel("menu.more".localized)
+        .accessibilityLabel("review.rate".localized)
     }
 
     // MARK: - Helpers
