@@ -23,8 +23,8 @@ final class ReviewPromptManager: ObservableObject {
     private let defaults: UserDefaults
 
     private let minimumLaunches = 3
-    private let minimumSuccessfulCreations = 5
-    private let minimumAppAge: TimeInterval = 7 * 24 * 60 * 60
+    private let minimumSuccessfulCreations = 2
+    private let minimumAppAge: TimeInterval = 3 * 24 * 60 * 60
     private let minimumPromptInterval: TimeInterval = 120 * 24 * 60 * 60
     private let promptWindow: TimeInterval = 365 * 24 * 60 * 60
     private let maximumPromptAttemptsPerYear = 2
@@ -44,6 +44,13 @@ final class ReviewPromptManager: ObservableObject {
     func queueAfterSuccessfulVideoExport() {
         guard pendingRequestID == nil else { return }
         pendingRequestID = UUID()
+    }
+
+    /// 用户主动前往 App Store 评价后，避免在同一版本再次展示系统评分请求。
+    func recordManualReviewIntent(now: Date = Date()) {
+        clearPendingRequest()
+        defaults.set(now, forKey: Key.lastPromptDate)
+        defaults.set(currentAppVersion, forKey: Key.lastPromptedVersion)
     }
 
     /// 在主界面延迟后调用。符合频控条件时会消费这次请求机会。

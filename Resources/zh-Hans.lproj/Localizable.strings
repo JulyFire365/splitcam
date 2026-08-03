@@ -3,6 +3,8 @@
 "cancel" = "取消";
 "error" = "错误";
 "processing" = "正在处理...";
+"menu.more" = "更多";
+"review.rate" = "给 SplitCam 评分";
 
 /* ===== 拍摄模式 ===== */
 "mode.photo" = "拍照";

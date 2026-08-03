@@ -6,6 +6,7 @@ struct CameraView: View {
     let mode: CaptureMode
 
     @EnvironmentObject var coordinator: AppCoordinator
+    @Environment(\.openURL) private var openURL
     @StateObject private var viewModel = CameraViewModel()
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
@@ -177,8 +178,11 @@ struct CameraView: View {
 
                 Spacer()
 
-                // 右: 最近拍摄缩略图
-                lastMediaButton
+                // 右: 更多菜单 + 最近拍摄缩略图
+                HStack(spacing: 8) {
+                    moreMenu
+                    lastMediaButton
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -640,6 +644,35 @@ struct CameraView: View {
                 Color.clear.frame(width: 40, height: 40)
             }
         }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button {
+                ReviewPromptManager.shared.recordManualReviewIntent()
+                if let reviewURL = URL(string: "https://apps.apple.com/app/id6761194664?action=write-review") {
+                    openURL(reviewURL)
+                }
+            } label: {
+                Label("review.rate".localized, systemImage: "star.bubble")
+            }
+
+            Button {
+                Task {
+                    await subscriptionManager.restorePurchases()
+                }
+            } label: {
+                Label("paywall.restore".localized, systemImage: "arrow.clockwise")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(.white.opacity(0.15)))
+                .contentShape(Circle())
+        }
+        .accessibilityLabel("menu.more".localized)
     }
 
     // MARK: - Helpers
