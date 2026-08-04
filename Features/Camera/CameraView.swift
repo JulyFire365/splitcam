@@ -6,10 +6,11 @@ struct CameraView: View {
     let mode: CaptureMode
 
     @EnvironmentObject var coordinator: AppCoordinator
-    @Environment(\.openURL) private var openURL
     @StateObject private var viewModel = CameraViewModel()
+    @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
+    @State private var showSettings = false
     @State private var paywallTrigger: ProFeature?
     @State private var focusPoint: CGPoint?
     @State private var showFocusIndicator = false
@@ -58,7 +59,7 @@ struct CameraView: View {
         }
         .navigationBarHidden(true)
         .statusBarHidden(true)
-        .onAppear { viewModel.setup(mode: mode) }
+        .onAppear { viewModel.setup(mode: mode, settings: appSettings) }
         .onDisappear { viewModel.cleanup() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             if viewModel.permissionDenied {
@@ -74,6 +75,22 @@ struct CameraView: View {
             MediaPicker(isPresented: $viewModel.showVideoPicker) { result in
                 viewModel.handlePickedMedia(result)
             }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(settings: appSettings)
+                .presentationDetents([.large])
+        }
+        .onChange(of: appSettings.defaultAspectRatio) { ratio in
+            guard !viewModel.isRecording else { return }
+            viewModel.setAspectRatio(ratio)
+        }
+        .onChange(of: appSettings.defaultVideoQuality) { quality in
+            guard !viewModel.isRecording else { return }
+            viewModel.resolutionQuality = quality
+            viewModel.syncRecordingSnapshot()
+        }
+        .onChange(of: appSettings.frontCameraMirrored) { mirrored in
+            viewModel.setFrontMirrored(mirrored)
         }
         .alert("error".localized, isPresented: $viewModel.showError) {
             Button("ok".localized, role: .cancel) {}
@@ -260,6 +277,9 @@ struct CameraView: View {
                     } else {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             viewModel.splitMode = splitMode
+                            if appSettings.remembersLastLayout {
+                                appSettings.lastSplitMode = splitMode
+                            }
                         }
                     }
                 } label: {
@@ -380,6 +400,7 @@ struct CameraView: View {
             // 右：镜像翻转
             toolButton(icon: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
                 viewModel.toggleMirror()
+                appSettings.frontCameraMirrored = viewModel.isFrontMirrored
             }
             .frame(maxWidth: .infinity)
         }
@@ -486,11 +507,13 @@ struct CameraView: View {
             if viewModel.resolutionQuality == .standard {
                 withAnimation(.spring(response: 0.3)) {
                     viewModel.resolutionQuality = .high
+                    appSettings.defaultVideoQuality = .high
                     viewModel.syncRecordingSnapshot()
                 }
             } else {
                 withAnimation(.spring(response: 0.3)) {
                     viewModel.resolutionQuality = .standard
+                    appSettings.defaultVideoQuality = .standard
                     viewModel.syncRecordingSnapshot()
                 }
             }
@@ -624,15 +647,10 @@ struct CameraView: View {
     // MARK: - Last Media Button
 
     private var mediaActions: some View {
-        Group {
-            if viewModel.lastSavedThumbnail != nil {
-                HStack(spacing: 8) {
-                    reviewButton
-                    lastMediaButton
-                }
-            } else {
-                Color.clear.frame(width: 40, height: 40)
-            }
+        HStack(spacing: 8) {
+            toolButton(icon: "gearshape") { showSettings = true }
+                .accessibilityLabel("settings.title".localized)
+            lastMediaButton
         }
     }
 
@@ -654,16 +672,6 @@ struct CameraView: View {
                 Color.clear.frame(width: 40, height: 40)
             }
         }
-    }
-
-    private var reviewButton: some View {
-        toolButton(icon: "star.bubble") {
-            ReviewPromptManager.shared.recordManualReviewIntent()
-            if let reviewURL = URL(string: "https://apps.apple.com/app/id6761194664?action=write-review") {
-                openURL(reviewURL)
-            }
-        }
-        .accessibilityLabel("review.rate".localized)
     }
 
     // MARK: - Helpers

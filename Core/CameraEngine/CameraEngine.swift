@@ -458,6 +458,14 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         }
     }
 
+    func setFrontMirrored(_ mirrored: Bool) {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            self.isFrontMirrored = mirrored
+            self.frontConnection?.isVideoMirrored = mirrored
+        }
+    }
+
     func toggleBackMirror() {
         sessionQueue.async { [weak self] in
             guard let self, let connection = self.backConnection else { return }

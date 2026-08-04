@@ -5,6 +5,26 @@
 "processing" = "正在处理...";
 "review.rate" = "给 SplitCam 评分";
 
+/* ===== 设置 ===== */
+"settings.title" = "设置";
+"settings.done" = "完成";
+"settings.section.appearance" = "外观";
+"settings.section.capture" = "拍摄偏好";
+"settings.section.support" = "支持";
+"settings.section.about" = "关于";
+"settings.appIcon" = "App 图标";
+"settings.icon.signature" = "经典";
+"settings.icon.midnight" = "午夜";
+"settings.icon.sunset" = "日落";
+"settings.icon.mono" = "单色";
+"settings.icon.notSupported" = "此设备不支持更换 App 图标。";
+"settings.aspectRatio" = "默认画幅";
+"settings.frontMirror" = "镜像前置摄像头";
+"settings.rememberLayout" = "记住上次布局";
+"settings.videoQuality" = "默认视频画质";
+"settings.rate" = "给 SplitCam 评分";
+"settings.version" = "版本";
+
 /* ===== 拍摄模式 ===== */
 "mode.photo" = "拍照";
 "mode.video" = "拍摄";

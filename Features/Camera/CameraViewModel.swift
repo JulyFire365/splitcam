@@ -138,8 +138,12 @@ final class CameraViewModel: ObservableObject {
 
     // MARK: - Setup
 
-    func setup(mode: CaptureMode) {
+    func setup(mode: CaptureMode, settings: AppSettings) {
         captureMode = mode
+        aspectRatio = settings.defaultAspectRatio
+        resolutionQuality = settings.defaultVideoQuality
+        isFrontMirrored = settings.frontCameraMirrored
+        splitMode = settings.remembersLastLayout ? settings.lastSplitMode : .leftRight
 
         cameraEngine.$isRecording
             .receive(on: DispatchQueue.main)
@@ -243,6 +247,7 @@ final class CameraViewModel: ObservableObject {
             }
             // setupSession 内部配置完后会自动 startRunning，减少一次队列调度延迟
             cameraEngine.setupSession(resolution: resolution)
+            cameraEngine.setFrontMirrored(isFrontMirrored)
         }
     }
 
@@ -332,6 +337,12 @@ final class CameraViewModel: ObservableObject {
     func toggleMirror() {
         isFrontMirrored.toggle()
         cameraEngine.toggleFrontMirror()
+    }
+
+    func setFrontMirrored(_ mirrored: Bool) {
+        guard isFrontMirrored != mirrored else { return }
+        isFrontMirrored = mirrored
+        cameraEngine.setFrontMirrored(mirrored)
     }
 
     // MARK: - Recording / Photo Actions

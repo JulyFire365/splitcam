@@ -5,6 +5,26 @@
 "processing" = "Processing...";
 "review.rate" = "Rate SplitCam";
 
+/* ===== Settings ===== */
+"settings.title" = "Settings";
+"settings.done" = "Done";
+"settings.section.appearance" = "Appearance";
+"settings.section.capture" = "Capture Preferences";
+"settings.section.support" = "Support";
+"settings.section.about" = "About";
+"settings.appIcon" = "App Icon";
+"settings.icon.signature" = "Signature";
+"settings.icon.midnight" = "Midnight";
+"settings.icon.sunset" = "Sunset";
+"settings.icon.mono" = "Mono";
+"settings.icon.notSupported" = "App icon changes are not supported on this device.";
+"settings.aspectRatio" = "Default Frame";
+"settings.frontMirror" = "Mirror Front Camera";
+"settings.rememberLayout" = "Remember Last Layout";
+"settings.videoQuality" = "Default Video Quality";
+"settings.rate" = "Rate SplitCam";
+"settings.version" = "Version";
+
 /* ===== Capture Mode ===== */
 "mode.photo" = "Photo";
 "mode.video" = "Video";
