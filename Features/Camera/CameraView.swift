@@ -195,7 +195,7 @@ struct CameraView: View {
 
                 Spacer()
 
-                // 右: 用户保存过作品后再显示评分入口，避免首次打开时出现孤立菜单。
+                // 右：相册入口；没有最近作品时，设置按钮自然贴齐右侧。
                 mediaActions
             }
             .padding(.horizontal, 16)
@@ -650,7 +650,10 @@ struct CameraView: View {
         HStack(spacing: 8) {
             toolButton(icon: "gearshape") { showSettings = true }
                 .accessibilityLabel("settings.title".localized)
-            lastMediaButton
+
+            if viewModel.lastSavedThumbnail != nil {
+                lastMediaButton
+            }
         }
     }
 
@@ -668,8 +671,6 @@ struct CameraView: View {
                                 .stroke(.white.opacity(0.4), lineWidth: 1.5)
                         )
                 }
-            } else {
-                Color.clear.frame(width: 40, height: 40)
             }
         }
     }

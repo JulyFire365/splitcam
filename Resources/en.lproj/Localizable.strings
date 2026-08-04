@@ -20,7 +20,7 @@
 "settings.icon.notSupported" = "App icon changes are not supported on this device.";
 "settings.aspectRatio" = "Default Frame";
 "settings.frontMirror" = "Mirror Front Camera";
-"settings.rememberLayout" = "Remember Last Layout";
+"settings.rememberLayout" = "Remember Last Split Layout";
 "settings.videoQuality" = "Default Video Quality";
 "settings.rate" = "Rate SplitCam";
 "settings.version" = "Version";

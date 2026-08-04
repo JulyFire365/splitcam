@@ -20,7 +20,7 @@
 "settings.icon.notSupported" = "此设备不支持更换 App 图标。";
 "settings.aspectRatio" = "默认画幅";
 "settings.frontMirror" = "镜像前置摄像头";
-"settings.rememberLayout" = "记住上次布局";
+"settings.rememberLayout" = "记住上次分屏布局";
 "settings.videoQuality" = "默认视频画质";
 "settings.rate" = "给 SplitCam 评分";
 "settings.version" = "版本";

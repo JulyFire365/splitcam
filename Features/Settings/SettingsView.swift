@@ -29,10 +29,10 @@ struct SettingsView: View {
                 }
 
                 Section("settings.section.capture".localized) {
-                    Picker("settings.aspectRatio".localized, selection: $settings.defaultAspectRatio) {
-                        ForEach(AspectRatioMode.allCases) { ratio in
-                            Text(ratio.rawValue).tag(ratio)
-                        }
+                    NavigationLink {
+                        AspectRatioPickerView(settings: settings)
+                    } label: {
+                        LabeledContent("settings.aspectRatio".localized, value: settings.defaultAspectRatio.rawValue)
                     }
 
                     Toggle("settings.frontMirror".localized, isOn: $settings.frontCameraMirrored)
@@ -55,10 +55,12 @@ struct SettingsView: View {
                         Label("settings.rate".localized, systemImage: "star.bubble")
                     }
 
-                    Button {
-                        Task { await subscriptionManager.restorePurchases() }
-                    } label: {
-                        Label("paywall.restore".localized, systemImage: "arrow.clockwise")
+                    if !subscriptionManager.isPro {
+                        Button {
+                            Task { await subscriptionManager.restorePurchases() }
+                        } label: {
+                            Label("paywall.restore".localized, systemImage: "arrow.clockwise")
+                        }
                     }
                 }
 
@@ -84,6 +86,40 @@ struct SettingsView: View {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
         return "\(shortVersion) (\(build))"
+    }
+}
+
+/// A dedicated, full-row selection screen avoids the inconsistent hit target of a Picker inside List.
+private struct AspectRatioPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(AspectRatioMode.allCases) { ratio in
+                    Button {
+                        settings.defaultAspectRatio = ratio
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Text(ratio.rawValue)
+                            Spacer()
+                            if ratio == settings.defaultAspectRatio {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.yellow)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color.black)
+        .navigationTitle("settings.aspectRatio".localized)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
