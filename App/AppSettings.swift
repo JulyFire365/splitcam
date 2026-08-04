@@ -62,6 +62,29 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(lastSplitMode.rawValue, forKey: Key.lastSplitMode) }
     }
 
+    @Published var lastSplitRatio: CGFloat {
+        didSet { defaults.set(lastSplitRatio, forKey: Key.lastSplitRatio) }
+    }
+
+    @Published var lastPipShape: PipShape {
+        didSet { defaults.set(lastPipShape.rawValue, forKey: Key.lastPipShape) }
+    }
+
+    @Published var lastPipScale: CGFloat {
+        didSet { defaults.set(lastPipScale, forKey: Key.lastPipScale) }
+    }
+
+    @Published var lastPipOffset: CGSize {
+        didSet {
+            defaults.set(lastPipOffset.width, forKey: Key.lastPipOffsetX)
+            defaults.set(lastPipOffset.height, forKey: Key.lastPipOffsetY)
+        }
+    }
+
+    @Published var lastPanelsSwapped: Bool {
+        didSet { defaults.set(lastPanelsSwapped, forKey: Key.lastPanelsSwapped) }
+    }
+
     @Published var defaultVideoQuality: ResolutionQuality {
         didSet { defaults.set(defaultVideoQuality.rawValue, forKey: Key.defaultVideoQuality) }
     }
@@ -73,6 +96,12 @@ final class AppSettings: ObservableObject {
         static let frontCameraMirrored = "settings.frontCameraMirrored"
         static let remembersLastLayout = "settings.remembersLastLayout"
         static let lastSplitMode = "settings.lastSplitMode"
+        static let lastSplitRatio = "settings.lastSplitRatio"
+        static let lastPipShape = "settings.lastPipShape"
+        static let lastPipScale = "settings.lastPipScale"
+        static let lastPipOffsetX = "settings.lastPipOffsetX"
+        static let lastPipOffsetY = "settings.lastPipOffsetY"
+        static let lastPanelsSwapped = "settings.lastPanelsSwapped"
         static let defaultVideoQuality = "settings.defaultVideoQuality"
     }
 
@@ -84,6 +113,18 @@ final class AppSettings: ObservableObject {
         frontCameraMirrored = defaults.object(forKey: Key.frontCameraMirrored) as? Bool ?? true
         remembersLastLayout = defaults.object(forKey: Key.remembersLastLayout) as? Bool ?? true
         lastSplitMode = SplitMode(rawValue: defaults.string(forKey: Key.lastSplitMode) ?? "") ?? .leftRight
+        lastSplitRatio = defaults.object(forKey: Key.lastSplitRatio) == nil
+            ? 0.5
+            : CGFloat(defaults.double(forKey: Key.lastSplitRatio))
+        lastPipShape = PipShape(rawValue: defaults.string(forKey: Key.lastPipShape) ?? "") ?? .roundedRect
+        lastPipScale = defaults.object(forKey: Key.lastPipScale) == nil
+            ? 0.3
+            : CGFloat(defaults.double(forKey: Key.lastPipScale))
+        lastPipOffset = CGSize(
+            width: CGFloat(defaults.double(forKey: Key.lastPipOffsetX)),
+            height: CGFloat(defaults.double(forKey: Key.lastPipOffsetY))
+        )
+        lastPanelsSwapped = defaults.object(forKey: Key.lastPanelsSwapped) as? Bool ?? false
         defaultVideoQuality = ResolutionQuality(rawValue: defaults.string(forKey: Key.defaultVideoQuality) ?? "") ?? .standard
         selectedAppIcon = SplitCamAppIcon(alternateIconName: UIApplication.shared.alternateIconName)
     }

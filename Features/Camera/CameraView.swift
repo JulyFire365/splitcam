@@ -277,9 +277,6 @@ struct CameraView: View {
                     } else {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             viewModel.splitMode = splitMode
-                            if appSettings.remembersLastLayout {
-                                appSettings.lastSplitMode = splitMode
-                            }
                         }
                     }
                 } label: {

@@ -68,6 +68,7 @@ final class CameraViewModel: ObservableObject {
     private var backFrameCount = 0
 
     private var cancellables = Set<AnyCancellable>()
+    private var layoutPersistenceCancellables = Set<AnyCancellable>()
 
     // MARK: - Real-time Composed Recording
 
@@ -143,7 +144,8 @@ final class CameraViewModel: ObservableObject {
         aspectRatio = settings.defaultAspectRatio
         resolutionQuality = settings.defaultVideoQuality
         isFrontMirrored = settings.frontCameraMirrored
-        splitMode = settings.remembersLastLayout ? settings.lastSplitMode : .leftRight
+        restoreLayout(from: settings)
+        observeLayoutPersistence(using: settings)
 
         cameraEngine.$isRecording
             .receive(on: DispatchQueue.main)
@@ -249,6 +251,86 @@ final class CameraViewModel: ObservableObject {
             cameraEngine.setupSession(resolution: resolution)
             cameraEngine.setFrontMirrored(isFrontMirrored)
         }
+    }
+
+    // MARK: - Layout Persistence
+
+    private func restoreLayout(from settings: AppSettings) {
+        guard settings.remembersLastLayout else {
+            splitMode = .leftRight
+            panelsSwapped = false
+            layoutEngine.splitRatio = 0.5
+            layoutEngine.pipShape = .roundedRect
+            layoutEngine.pipScale = 0.3
+            layoutEngine.pipOffset = .zero
+            return
+        }
+
+        splitMode = settings.lastSplitMode
+        panelsSwapped = settings.lastPanelsSwapped
+        layoutEngine.splitRatio = settings.lastSplitRatio
+        layoutEngine.pipShape = settings.lastPipShape
+        layoutEngine.pipScale = settings.lastPipScale
+        layoutEngine.pipOffset = settings.lastPipOffset
+    }
+
+    private func observeLayoutPersistence(using settings: AppSettings) {
+        layoutPersistenceCancellables.removeAll()
+
+        $splitMode.dropFirst()
+            .sink { [weak settings] mode in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastSplitMode = mode
+            }
+            .store(in: &layoutPersistenceCancellables)
+        $panelsSwapped.dropFirst()
+            .sink { [weak settings] swapped in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastPanelsSwapped = swapped
+            }
+            .store(in: &layoutPersistenceCancellables)
+        layoutEngine.$splitRatio.dropFirst()
+            .sink { [weak settings] ratio in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastSplitRatio = ratio
+            }
+            .store(in: &layoutPersistenceCancellables)
+        layoutEngine.$pipShape.dropFirst()
+            .sink { [weak settings] shape in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastPipShape = shape
+            }
+            .store(in: &layoutPersistenceCancellables)
+        layoutEngine.$pipScale.dropFirst()
+            .sink { [weak settings] scale in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastPipScale = scale
+            }
+            .store(in: &layoutPersistenceCancellables)
+        layoutEngine.$pipOffset.dropFirst()
+            .sink { [weak settings] offset in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastPipOffset = offset
+            }
+            .store(in: &layoutPersistenceCancellables)
+        settings.$remembersLastLayout
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self, weak settings] enabled in
+                if enabled, let self, let settings {
+                    self.persistCurrentLayout(to: settings)
+                }
+            }
+            .store(in: &layoutPersistenceCancellables)
+    }
+
+    private func persistCurrentLayout(to settings: AppSettings) {
+        settings.lastSplitMode = splitMode
+        settings.lastPanelsSwapped = panelsSwapped
+        settings.lastSplitRatio = layoutEngine.splitRatio
+        settings.lastPipShape = layoutEngine.pipShape
+        settings.lastPipScale = layoutEngine.pipScale
+        settings.lastPipOffset = layoutEngine.pipOffset
     }
 
     func recheckPermissions() {
