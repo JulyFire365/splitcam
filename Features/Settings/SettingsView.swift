@@ -38,10 +38,10 @@ struct SettingsView: View {
                     Toggle("settings.frontMirror".localized, isOn: $settings.frontCameraMirrored)
                     Toggle("settings.rememberLayout".localized, isOn: $settings.remembersLastLayout)
 
-                    Picker("settings.videoQuality".localized, selection: $settings.defaultVideoQuality) {
-                        ForEach(ResolutionQuality.allCases, id: \.self) { quality in
-                            Text(quality.displayName).tag(quality)
-                        }
+                    NavigationLink {
+                        VideoQualityPickerView(settings: settings)
+                    } label: {
+                        LabeledContent("settings.videoQuality".localized, value: settings.defaultVideoQuality.displayName)
                     }
                 }
 
@@ -119,6 +119,39 @@ private struct AspectRatioPickerView: View {
         .scrollContentBackground(.hidden)
         .background(Color.black)
         .navigationTitle("settings.aspectRatio".localized)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct VideoQualityPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(ResolutionQuality.allCases, id: \.self) { quality in
+                    Button {
+                        settings.defaultVideoQuality = quality
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Text(quality.displayName)
+                            Spacer()
+                            if quality == settings.defaultVideoQuality {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.yellow)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color.black)
+        .navigationTitle("settings.videoQuality".localized)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
