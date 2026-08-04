@@ -1,8 +1,7 @@
-New settings and refinements:
+Introducing Settings:
 
-- A new Settings hub lets you change the app icon and choose your default frame, front-camera mirroring, and video quality.
-- Remember your last split-screen layout, including the split ratio and Picture-in-Picture adjustments.
-- Refined Pro badges and unlock guidance in video mode.
-- General experience and stability improvements.
+- Change your app icon.
+- Set your default frame, front-camera mirroring, and video quality.
+- Remember your last split-screen layout and restore it when you reopen the app.
 
 Thanks for using SplitCam!
