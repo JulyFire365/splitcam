@@ -333,6 +333,12 @@ final class CameraViewModel: ObservableObject {
         settings.lastPipOffset = layoutEngine.pipOffset
     }
 
+    /// Called at explicit lifecycle boundaries as a safeguard for force-quit flows.
+    func persistLayoutIfNeeded(to settings: AppSettings) {
+        guard settings.remembersLastLayout else { return }
+        persistCurrentLayout(to: settings)
+    }
+
     func recheckPermissions() {
         Task {
             let granted = await cameraEngine.checkPermissions()

@@ -6,6 +6,7 @@ struct CameraView: View {
     let mode: CaptureMode
 
     @EnvironmentObject var coordinator: AppCoordinator
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel = CameraViewModel()
     @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
@@ -60,7 +61,15 @@ struct CameraView: View {
         .navigationBarHidden(true)
         .statusBarHidden(true)
         .onAppear { viewModel.setup(mode: mode, settings: appSettings) }
-        .onDisappear { viewModel.cleanup() }
+        .onDisappear {
+            viewModel.persistLayoutIfNeeded(to: appSettings)
+            viewModel.cleanup()
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .background {
+                viewModel.persistLayoutIfNeeded(to: appSettings)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             if viewModel.permissionDenied {
                 viewModel.recheckPermissions()
@@ -278,6 +287,7 @@ struct CameraView: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             viewModel.splitMode = splitMode
                         }
+                        viewModel.persistLayoutIfNeeded(to: appSettings)
                     }
                 } label: {
                     ZStack(alignment: .topTrailing) {
