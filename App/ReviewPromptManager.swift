@@ -40,8 +40,8 @@ final class ReviewPromptManager: ObservableObject {
                      forKey: Key.successfulCreationCount)
     }
 
-    /// 视频导出并保存成功后，将评分请求排队至用户回到主界面时处理。
-    func queueAfterSuccessfulVideoExport() {
+    /// 视频已成功写入系统相册后，将评分请求排队至主界面处理。
+    func queueAfterSuccessfulVideoSave() {
         guard pendingRequestID == nil else { return }
         pendingRequestID = UUID()
     }

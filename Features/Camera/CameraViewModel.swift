@@ -664,6 +664,7 @@ final class CameraViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     if success {
                         ReviewPromptManager.shared.recordSuccessfulCreation()
+                        ReviewPromptManager.shared.queueAfterSuccessfulVideoSave()
                     }
                     self.isProcessing = false
                 }
