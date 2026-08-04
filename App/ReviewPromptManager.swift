@@ -20,7 +20,7 @@ final class ReviewPromptManager: ObservableObject {
 
     private let defaults: UserDefaults
 
-    private let minimumSuccessfulCreations = 1
+    private let minimumSuccessfulCreations = 2
     private let minimumPromptInterval: TimeInterval = 90 * 24 * 60 * 60
     private let promptWindow: TimeInterval = 365 * 24 * 60 * 60
     private let maximumPromptAttemptsPerYear = 2
