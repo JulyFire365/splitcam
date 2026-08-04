@@ -80,7 +80,7 @@ struct HomeView: View {
                 Spacer()
 
                 // Version info
-                Text("v1.5 (6)")
+                Text("v1.6 (7)")
                     .font(.caption2)
                     .foregroundColor(.gray.opacity(0.5))
                     .padding(.bottom, 8)
