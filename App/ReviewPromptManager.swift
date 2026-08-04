@@ -12,8 +12,6 @@ final class ReviewPromptManager: ObservableObject {
     @Published private(set) var pendingRequestID: UUID?
 
     private enum Key {
-        static let firstLaunchDate = "review.firstLaunchDate"
-        static let launchCount = "review.launchCount"
         static let successfulCreationCount = "review.successfulCreationCount"
         static let lastPromptDate = "review.lastPromptDate"
         static let lastPromptedVersion = "review.lastPromptedVersion"
@@ -22,16 +20,13 @@ final class ReviewPromptManager: ObservableObject {
 
     private let defaults: UserDefaults
 
-    private let minimumLaunches = 3
-    private let minimumSuccessfulCreations = 2
-    private let minimumAppAge: TimeInterval = 3 * 24 * 60 * 60
-    private let minimumPromptInterval: TimeInterval = 120 * 24 * 60 * 60
+    private let minimumSuccessfulCreations = 1
+    private let minimumPromptInterval: TimeInterval = 90 * 24 * 60 * 60
     private let promptWindow: TimeInterval = 365 * 24 * 60 * 60
     private let maximumPromptAttemptsPerYear = 2
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        recordLaunch()
     }
 
     /// 仅在图片或视频真正保存成功后调用，用于衡量用户是否已获得足够价值。
@@ -40,8 +35,8 @@ final class ReviewPromptManager: ObservableObject {
                      forKey: Key.successfulCreationCount)
     }
 
-    /// 视频已成功写入系统相册后，将评分请求排队至主界面处理。
-    func queueAfterSuccessfulVideoSave() {
+    /// 任意作品成功写入系统相册后，将评分请求排队至主界面处理。
+    func queueAfterSuccessfulCreation() {
         guard pendingRequestID == nil else { return }
         pendingRequestID = UUID()
     }
@@ -68,18 +63,8 @@ final class ReviewPromptManager: ObservableObject {
         return true
     }
 
-    private func recordLaunch() {
-        if defaults.object(forKey: Key.firstLaunchDate) == nil {
-            defaults.set(Date(), forKey: Key.firstLaunchDate)
-        }
-        defaults.set(defaults.integer(forKey: Key.launchCount) + 1, forKey: Key.launchCount)
-    }
-
     private func isEligibleForPrompt(at now: Date) -> Bool {
-        guard let firstLaunchDate = defaults.object(forKey: Key.firstLaunchDate) as? Date,
-              now.timeIntervalSince(firstLaunchDate) >= minimumAppAge,
-              defaults.integer(forKey: Key.launchCount) >= minimumLaunches,
-              defaults.integer(forKey: Key.successfulCreationCount) >= minimumSuccessfulCreations,
+        guard defaults.integer(forKey: Key.successfulCreationCount) >= minimumSuccessfulCreations,
               defaults.string(forKey: Key.lastPromptedVersion) != currentAppVersion else {
             return false
         }

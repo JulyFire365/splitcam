@@ -207,7 +207,7 @@ struct ExportView: View {
         }
         .alert("已保存", isPresented: $viewModel.showSaveSuccess) {
             Button("好的") {
-                ReviewPromptManager.shared.queueAfterSuccessfulVideoSave()
+                ReviewPromptManager.shared.queueAfterSuccessfulCreation()
             }
         } message: {
             Text("视频已保存到相册")

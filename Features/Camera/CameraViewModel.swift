@@ -650,6 +650,7 @@ final class CameraViewModel: ObservableObject {
                 guard success else { return }
                 DispatchQueue.main.async {
                     ReviewPromptManager.shared.recordSuccessfulCreation()
+                    ReviewPromptManager.shared.queueAfterSuccessfulCreation()
                 }
             }
         }
@@ -664,7 +665,7 @@ final class CameraViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     if success {
                         ReviewPromptManager.shared.recordSuccessfulCreation()
-                        ReviewPromptManager.shared.queueAfterSuccessfulVideoSave()
+                        ReviewPromptManager.shared.queueAfterSuccessfulCreation()
                     }
                     self.isProcessing = false
                 }
