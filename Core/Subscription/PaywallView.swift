@@ -344,6 +344,7 @@ extension ProFeature: CaseIterable {
     static var allCases: [ProFeature] = [
         .pipMode,
         .duetMode,
+        .appIcons,
     ]
 }
 

@@ -12,6 +12,9 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
     @State private var pipScaleStart: CGFloat = 0.3
     /// 是否已交互过（拖拽/缩放），用于隐藏引导提示
     @State private var hasInteracted = false
+    /// 画中画缩放引导只在首次进入画中画时展示一次，跨启动保留。
+    @AppStorage("settings.hasShownPipScaleHint") private var hasShownPipScaleHint = false
+    @State private var showPipScaleHint = false
 
     init(layout: SplitLayoutEngine,
          isDraggingBinding: Binding<Bool> = .constant(false),
@@ -97,7 +100,7 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                 .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
 
             // 缩放引导提示
-            if !hasInteracted {
+            if showPipScaleHint {
                 PipScaleHint()
                     .frame(width: isCircle ? size : pipFrame.width,
                            height: isCircle ? size : pipFrame.height)
@@ -124,7 +127,7 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                         width: pipDragStartOffset.width + value.translation.width / safeWidth,
                         height: pipDragStartOffset.height + value.translation.height / safeHeight
                     )
-                    dismissHint()
+                    dismissPipScaleHint()
                 }
                 .onEnded { _ in
                     isDragging = false
@@ -141,7 +144,7 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                     let newScale = pipScaleStart * scale
                     layout.pipScale = min(SplitLayoutEngine.pipMaxScale,
                                           max(SplitLayoutEngine.pipMinScale, newScale))
-                    dismissHint()
+                    dismissPipScaleHint()
                 }
                 .onEnded { _ in
                     pipScaleStart = 0
@@ -153,14 +156,30 @@ struct SplitPreviewView<FirstContent: View, SecondContent: View>: View {
                 layout.pipShape = layout.pipShape == .roundedRect ? .circle : .roundedRect
             }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            dismissHint()
+            dismissPipScaleHint()
         }
+        .onAppear { showPipScaleHintIfNeeded() }
     }
 
     private func dismissHint() {
         guard !hasInteracted else { return }
         withAnimation(.easeOut(duration: 0.3)) {
             hasInteracted = true
+        }
+    }
+
+    private func showPipScaleHintIfNeeded() {
+        guard !hasShownPipScaleHint else { return }
+        hasShownPipScaleHint = true
+        withAnimation(.easeOut(duration: 0.2)) {
+            showPipScaleHint = true
+        }
+    }
+
+    private func dismissPipScaleHint() {
+        guard showPipScaleHint else { return }
+        withAnimation(.easeOut(duration: 0.3)) {
+            showPipScaleHint = false
         }
     }
 

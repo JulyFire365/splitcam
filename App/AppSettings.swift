@@ -7,6 +7,10 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
     case midnight
     case sunset
     case mono
+    case prism
+    case bauhaus
+    case pixel
+    case ink
 
     var id: String { rawValue }
 
@@ -16,6 +20,10 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
         case .midnight: "AppIconMidnight"
         case .sunset: "AppIconSunset"
         case .mono: "AppIconMono"
+        case .prism: "AppIconPrism"
+        case .bauhaus: "AppIconBauhaus"
+        case .pixel: "AppIconPixel"
+        case .ink: "AppIconInk"
         }
     }
 
@@ -25,6 +33,10 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
         case .midnight: "AppIconPreviewMidnight"
         case .sunset: "AppIconPreviewSunset"
         case .mono: "AppIconPreviewMono"
+        case .prism: "AppIconPreviewPrism"
+        case .bauhaus: "AppIconPreviewBauhaus"
+        case .pixel: "AppIconPreviewPixel"
+        case .ink: "AppIconPreviewInk"
         }
     }
 
@@ -32,11 +44,24 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
         "settings.icon.\(rawValue)".localized
     }
 
+    var requiresPro: Bool {
+        switch self {
+        case .bauhaus, .pixel, .ink:
+            true
+        default:
+            false
+        }
+    }
+
     init(alternateIconName: String?) {
         switch alternateIconName {
         case "AppIconMidnight": self = .midnight
         case "AppIconSunset": self = .sunset
         case "AppIconMono": self = .mono
+        case "AppIconPrism": self = .prism
+        case "AppIconBauhaus": self = .bauhaus
+        case "AppIconPixel": self = .pixel
+        case "AppIconInk": self = .ink
         default: self = .signature
         }
     }
@@ -85,6 +110,18 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(lastPanelsSwapped, forKey: Key.lastPanelsSwapped) }
     }
 
+    @Published var lastShootingMode: ShootingMode {
+        didSet { defaults.set(lastShootingMode.rawValue, forKey: Key.lastShootingMode) }
+    }
+
+    @Published var lastAspectRatio: AspectRatioMode {
+        didSet { defaults.set(lastAspectRatio.rawValue, forKey: Key.lastAspectRatio) }
+    }
+
+    @Published var lastFrontCameraMirrored: Bool {
+        didSet { defaults.set(lastFrontCameraMirrored, forKey: Key.lastFrontCameraMirrored) }
+    }
+
     @Published var defaultVideoQuality: ResolutionQuality {
         didSet { defaults.set(defaultVideoQuality.rawValue, forKey: Key.defaultVideoQuality) }
     }
@@ -102,6 +139,9 @@ final class AppSettings: ObservableObject {
         static let lastPipOffsetX = "settings.lastPipOffsetX"
         static let lastPipOffsetY = "settings.lastPipOffsetY"
         static let lastPanelsSwapped = "settings.lastPanelsSwapped"
+        static let lastShootingMode = "settings.lastShootingMode"
+        static let lastAspectRatio = "settings.lastAspectRatio"
+        static let lastFrontCameraMirrored = "settings.lastFrontCameraMirrored"
         static let defaultVideoQuality = "settings.defaultVideoQuality"
     }
 
@@ -109,8 +149,11 @@ final class AppSettings: ObservableObject {
 
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        defaultAspectRatio = AspectRatioMode(rawValue: defaults.string(forKey: Key.defaultAspectRatio) ?? "") ?? .ratio3_4
-        frontCameraMirrored = defaults.object(forKey: Key.frontCameraMirrored) as? Bool ?? true
+        let storedDefaultAspectRatio = AspectRatioMode(rawValue: defaults.string(forKey: Key.defaultAspectRatio) ?? "") ?? .ratio3_4
+        let storedFrontCameraMirrored = defaults.object(forKey: Key.frontCameraMirrored) as? Bool ?? true
+
+        defaultAspectRatio = storedDefaultAspectRatio
+        frontCameraMirrored = storedFrontCameraMirrored
         remembersLastLayout = defaults.object(forKey: Key.remembersLastLayout) as? Bool ?? true
         lastSplitMode = SplitMode(rawValue: defaults.string(forKey: Key.lastSplitMode) ?? "") ?? .leftRight
         lastSplitRatio = defaults.object(forKey: Key.lastSplitRatio) == nil
@@ -125,6 +168,9 @@ final class AppSettings: ObservableObject {
             height: CGFloat(defaults.double(forKey: Key.lastPipOffsetY))
         )
         lastPanelsSwapped = defaults.object(forKey: Key.lastPanelsSwapped) as? Bool ?? false
+        lastShootingMode = ShootingMode(rawValue: defaults.string(forKey: Key.lastShootingMode) ?? "") ?? .photo
+        lastAspectRatio = AspectRatioMode(rawValue: defaults.string(forKey: Key.lastAspectRatio) ?? "") ?? storedDefaultAspectRatio
+        lastFrontCameraMirrored = defaults.object(forKey: Key.lastFrontCameraMirrored) as? Bool ?? storedFrontCameraMirrored
         defaultVideoQuality = ResolutionQuality(rawValue: defaults.string(forKey: Key.defaultVideoQuality) ?? "") ?? .standard
         selectedAppIcon = SplitCamAppIcon(alternateIconName: UIApplication.shared.alternateIconName)
     }

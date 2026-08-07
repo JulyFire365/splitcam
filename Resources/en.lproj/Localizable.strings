@@ -11,18 +11,27 @@
 "settings.section.appearance" = "Appearance";
 "settings.section.capture" = "Capture Preferences";
 "settings.section.support" = "Support";
+"settings.section.moreApps" = "More Apps";
 "settings.section.about" = "About";
 "settings.appIcon" = "App Icon";
 "settings.icon.signature" = "Signature";
 "settings.icon.midnight" = "Midnight";
 "settings.icon.sunset" = "Sunset";
 "settings.icon.mono" = "Mono";
+"settings.icon.prism" = "Prism";
+"settings.icon.bauhaus" = "Bauhaus";
+"settings.icon.pixel" = "Pixel";
+"settings.icon.ink" = "Ink";
 "settings.icon.notSupported" = "App icon changes are not supported on this device.";
 "settings.aspectRatio" = "Default Frame";
 "settings.frontMirror" = "Mirror Front Camera";
-"settings.rememberLayout" = "Remember Last Split Layout";
+"settings.rememberLayout" = "Remember Last Capture Layout & Settings";
 "settings.videoQuality" = "Default Video Quality";
 "settings.rate" = "Rate SplitCam";
+"settings.contact" = "Contact";
+"settings.subscription.active" = "Subscribed";
+"settings.subscription.cta" = "Unlock all premium features";
+"settings.custodyJournal.subtitle" = "Discover it on the App Store";
 "settings.version" = "Version";
 
 /* ===== Capture Mode ===== */
@@ -51,11 +60,14 @@
 /* ===== Duet Mode ===== */
 "duet" = "Duet";
 "duet.hint.pinchToZoom" = "Pinch to zoom";
+"camera.controls.hide" = "Hide preview controls";
+"camera.controls.show" = "Show preview controls";
 
 /* ===== Subscription - Pro Features ===== */
 "pro.feature.unlimitedRecording" = "Unlimited Recording";
 "pro.feature.pipMode" = "Picture-in-Picture";
 "pro.feature.duetMode" = "Duet Mode";
+"pro.feature.appIcons" = "Premium App Icons";
 "pro.feature.telephoto" = "3x Telephoto";
 "pro.feature.allRatios" = "All Aspect Ratios";
 "pro.feature.layoutSwitch" = "Switch Layout While Recording";

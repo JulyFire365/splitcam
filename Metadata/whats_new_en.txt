@@ -1,7 +1,9 @@
-Introducing Settings:
+SplitCam 1.7:
 
-- Change your app icon.
-- Set your default frame, front-camera mirroring, and video quality.
-- Remember your last split-screen layout and restore it when you reopen the app.
+- Added more app icons, with selected premium styles available for Pro.
+- In 9:16, you can now collapse the frame and quality controls for a clearer composition.
+- Picture-in-Picture resize guidance now appears only on first use for a cleaner experience.
+- Remember Last Capture Layout & Settings now restores your photo/video mode, frame, camera swap, and mirror state.
+- Added a subscription entry point and contact email in Settings.
 
 Thanks for using SplitCam!

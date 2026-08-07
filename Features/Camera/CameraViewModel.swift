@@ -141,9 +141,7 @@ final class CameraViewModel: ObservableObject {
 
     func setup(mode: CaptureMode, settings: AppSettings) {
         captureMode = mode
-        aspectRatio = settings.defaultAspectRatio
         resolutionQuality = settings.defaultVideoQuality
-        isFrontMirrored = settings.frontCameraMirrored
         restoreLayout(from: settings)
         observeLayoutPersistence(using: settings)
 
@@ -259,6 +257,9 @@ final class CameraViewModel: ObservableObject {
         guard settings.remembersLastLayout else {
             splitMode = .leftRight
             panelsSwapped = false
+            shootingMode = .photo
+            aspectRatio = settings.defaultAspectRatio
+            isFrontMirrored = settings.frontCameraMirrored
             layoutEngine.splitRatio = 0.5
             layoutEngine.pipShape = .roundedRect
             layoutEngine.pipScale = 0.3
@@ -268,6 +269,9 @@ final class CameraViewModel: ObservableObject {
 
         splitMode = settings.lastSplitMode
         panelsSwapped = settings.lastPanelsSwapped
+        shootingMode = settings.lastShootingMode
+        aspectRatio = settings.lastAspectRatio
+        isFrontMirrored = settings.lastFrontCameraMirrored
         layoutEngine.splitRatio = settings.lastSplitRatio
         layoutEngine.pipShape = settings.lastPipShape
         layoutEngine.pipScale = settings.lastPipScale
@@ -287,6 +291,24 @@ final class CameraViewModel: ObservableObject {
             .sink { [weak settings] swapped in
                 guard let settings, settings.remembersLastLayout else { return }
                 settings.lastPanelsSwapped = swapped
+            }
+            .store(in: &layoutPersistenceCancellables)
+        $shootingMode.dropFirst()
+            .sink { [weak settings] mode in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastShootingMode = mode
+            }
+            .store(in: &layoutPersistenceCancellables)
+        $aspectRatio.dropFirst()
+            .sink { [weak settings] ratio in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastAspectRatio = ratio
+            }
+            .store(in: &layoutPersistenceCancellables)
+        $isFrontMirrored.dropFirst()
+            .sink { [weak settings] mirrored in
+                guard let settings, settings.remembersLastLayout else { return }
+                settings.lastFrontCameraMirrored = mirrored
             }
             .store(in: &layoutPersistenceCancellables)
         layoutEngine.$splitRatio.dropFirst()
@@ -327,6 +349,9 @@ final class CameraViewModel: ObservableObject {
     private func persistCurrentLayout(to settings: AppSettings) {
         settings.lastSplitMode = splitMode
         settings.lastPanelsSwapped = panelsSwapped
+        settings.lastShootingMode = shootingMode
+        settings.lastAspectRatio = aspectRatio
+        settings.lastFrontCameraMirrored = isFrontMirrored
         settings.lastSplitRatio = layoutEngine.splitRatio
         settings.lastPipShape = layoutEngine.pipShape
         settings.lastPipScale = layoutEngine.pipScale

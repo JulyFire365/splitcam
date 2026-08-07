@@ -11,18 +11,27 @@
 "settings.section.appearance" = "外观";
 "settings.section.capture" = "拍摄偏好";
 "settings.section.support" = "支持";
+"settings.section.moreApps" = "更多应用";
 "settings.section.about" = "关于";
 "settings.appIcon" = "App 图标";
 "settings.icon.signature" = "经典";
 "settings.icon.midnight" = "午夜";
 "settings.icon.sunset" = "日落";
 "settings.icon.mono" = "单色";
+"settings.icon.prism" = "幻彩";
+"settings.icon.bauhaus" = "几何";
+"settings.icon.pixel" = "像素";
+"settings.icon.ink" = "水墨";
 "settings.icon.notSupported" = "此设备不支持更换 App 图标。";
 "settings.aspectRatio" = "默认画幅";
 "settings.frontMirror" = "镜像前置摄像头";
-"settings.rememberLayout" = "记住上次分屏布局";
+"settings.rememberLayout" = "记住上次拍摄布局与设置";
 "settings.videoQuality" = "默认视频画质";
 "settings.rate" = "给 SplitCam 评分";
+"settings.contact" = "联系开发者";
+"settings.subscription.active" = "已订阅";
+"settings.subscription.cta" = "解锁全部高级功能";
+"settings.custodyJournal.subtitle" = "在 App Store 中了解";
 "settings.version" = "版本";
 
 /* ===== 拍摄模式 ===== */
@@ -51,11 +60,14 @@
 /* ===== 合拍模式 ===== */
 "duet" = "合拍";
 "duet.hint.pinchToZoom" = "捏合缩放";
+"camera.controls.hide" = "收起预览控制条";
+"camera.controls.show" = "显示预览控制条";
 
 /* ===== 订阅 - Pro 功能 ===== */
 "pro.feature.unlimitedRecording" = "无限录制时长";
 "pro.feature.pipMode" = "画中画模式";
 "pro.feature.duetMode" = "合拍模式";
+"pro.feature.appIcons" = "Pro 专属 App 图标";
 "pro.feature.telephoto" = "3x 长焦";
 "pro.feature.allRatios" = "全部画面比例";
 "pro.feature.layoutSwitch" = "录制中切换布局";

@@ -5,10 +5,15 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     @ObservedObject var settings: AppSettings
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @State private var showPaywall = false
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    subscriptionStatusRow
+                }
+
                 Section("settings.section.appearance".localized) {
                     NavigationLink {
                         AppIconPickerView(settings: settings)
@@ -46,6 +51,15 @@ struct SettingsView: View {
                 }
 
                 Section("settings.section.support".localized) {
+                    Link(destination: URL(string: "mailto:captainlongevity@gmail.com")!) {
+                        HStack {
+                            Label("settings.contact".localized, systemImage: "envelope")
+                            Spacer()
+                            Text("captainlongevity@gmail.com")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     Button {
                         ReviewPromptManager.shared.recordManualReviewIntent()
                         if let reviewURL = URL(string: "https://apps.apple.com/app/id6761194664?action=write-review") {
@@ -61,6 +75,34 @@ struct SettingsView: View {
                         } label: {
                             Label("paywall.restore".localized, systemImage: "arrow.clockwise")
                         }
+                    }
+                }
+
+                Section("settings.section.moreApps".localized) {
+                    Link(destination: URL(string: "https://apps.apple.com/app/id6762594124")!) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "book.closed.fill")
+                                .font(.title3)
+                                .foregroundStyle(.mint)
+                                .frame(width: 32, height: 32)
+                                .background(.mint.opacity(0.16), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Custody Journal")
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                Text("settings.custodyJournal.subtitle".localized)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 4)
                     }
                 }
 
@@ -80,6 +122,65 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .fullScreenCover(isPresented: $showPaywall) {
+            PaywallView(triggeredBy: nil)
+        }
+    }
+
+    @ViewBuilder
+    private var subscriptionStatusRow: some View {
+        if subscriptionManager.isPro {
+            subscriptionRow(
+                title: "SplitCam Pro",
+                subtitle: "settings.subscription.active".localized,
+                icon: "checkmark.seal.fill",
+                trailingIcon: nil
+            )
+        } else {
+            Button { showPaywall = true } label: {
+                subscriptionRow(
+                    title: "SplitCam Pro",
+                    subtitle: "settings.subscription.cta".localized,
+                    icon: "sparkles",
+                    trailingIcon: "chevron.right"
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func subscriptionRow(
+        title: String,
+        subtitle: String,
+        icon: String,
+        trailingIcon: String?
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.orange)
+                .frame(width: 32, height: 32)
+                .background(.orange.opacity(0.16), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if let trailingIcon {
+                Image(systemName: trailingIcon)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
     }
 
     private var appVersion: String {
@@ -159,8 +260,10 @@ private struct VideoQualityPickerView: View {
 private struct AppIconPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var settings: AppSettings
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var changingIcon = false
     @State private var errorMessage: String?
+    @State private var showPaywall = false
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
@@ -169,7 +272,7 @@ private struct AppIconPickerView: View {
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(SplitCamAppIcon.allCases) { icon in
                     Button {
-                        select(icon)
+                        selectOrPresentPaywall(for: icon)
                     } label: {
                         VStack(spacing: 10) {
                             Image(icon.previewImageName)
@@ -181,6 +284,17 @@ private struct AppIconPickerView: View {
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                                         .stroke(icon == settings.selectedAppIcon ? Color.yellow : .white.opacity(0.16), lineWidth: icon == settings.selectedAppIcon ? 3 : 1)
+                                }
+                                .overlay(alignment: .topTrailing) {
+                                    if icon.requiresPro && !subscriptionManager.isPro {
+                                        Text("PRO")
+                                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                                            .foregroundStyle(.black)
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 4)
+                                            .background(.yellow, in: Capsule())
+                                            .padding(8)
+                                    }
                                 }
 
                             HStack(spacing: 6) {
@@ -202,6 +316,9 @@ private struct AppIconPickerView: View {
         .background(Color.black)
         .navigationTitle("settings.appIcon".localized)
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $showPaywall) {
+            PaywallView(triggeredBy: .appIcons)
+        }
         .overlay {
             if changingIcon {
                 ProgressView()
@@ -227,6 +344,14 @@ private struct AppIconPickerView: View {
             } catch {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func selectOrPresentPaywall(for icon: SplitCamAppIcon) {
+        if icon.requiresPro && !subscriptionManager.isPro {
+            showPaywall = true
+        } else {
+            select(icon)
         }
     }
 }

@@ -15,6 +15,8 @@ struct CameraView: View {
     @State private var paywallTrigger: ProFeature?
     @State private var focusPoint: CGPoint?
     @State private var showFocusIndicator = false
+    @State private var portraitControlsCollapsed = false
+    @Namespace private var portraitControlsTransition
 
     var body: some View {
         ZStack {
@@ -100,6 +102,12 @@ struct CameraView: View {
         }
         .onChange(of: appSettings.frontCameraMirrored) { mirrored in
             viewModel.setFrontMirrored(mirrored)
+        }
+        .onChange(of: viewModel.aspectRatio) { ratio in
+            guard ratio == .ratio9_16 else {
+                portraitControlsCollapsed = false
+                return
+            }
         }
         .alert("error".localized, isPresented: $viewModel.showError) {
             Button("ok".localized, role: .cancel) {}
@@ -219,25 +227,36 @@ struct CameraView: View {
                 .ignoresSafeArea()
             )
 
-            // 比例选择器 + 合拍标签
-            ZStack {
-                // 比例栏：无合拍时居中，有合拍时左移
-                HStack {
-                    aspectRatioBar
-                    if viewModel.isDuetMode { Spacer() }
-                }
-                .frame(maxWidth: .infinity)
-
-                // 合拍胶囊：右对齐
-                if viewModel.isDuetMode {
+            // 比例选择器 + 合拍标签。9:16 时可收起，避免遮挡预览画面。
+            if shouldShowAspectRatioBar {
+                ZStack {
+                    // 比例栏：无合拍时居中，有合拍时左移
                     HStack {
-                        Spacer()
-                        duetModeBadge
+                        aspectRatioBar
+                        if viewModel.isDuetMode { Spacer() }
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    // 合拍胶囊：右对齐
+                    if viewModel.isDuetMode {
+                        HStack {
+                            Spacer()
+                            duetModeBadge
+                        }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            } else {
+                HStack {
+                    Spacer()
+                    restorePortraitControlsButton
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
         }
     }
 
@@ -346,10 +365,56 @@ struct CameraView: View {
 
             // 画质切换
             resolutionToggle
+
+            if canCollapseAspectControls {
+                Divider()
+                    .frame(height: 16)
+
+                Button(action: collapsePortraitControls) {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(.black.opacity(0.18)))
+                }
+                .matchedGeometryEffect(id: "portrait-controls-toggle", in: portraitControlsTransition)
+                .accessibilityLabel("camera.controls.hide".localized)
+            }
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
         .background(Capsule().fill(.ultraThinMaterial).environment(\.colorScheme, .dark))
+    }
+
+    private var canCollapseAspectControls: Bool {
+        viewModel.aspectRatio == .ratio9_16
+    }
+
+    private var shouldShowAspectRatioBar: Bool {
+        !canCollapseAspectControls || !portraitControlsCollapsed
+    }
+
+    private var restorePortraitControlsButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                portraitControlsCollapsed = false
+            }
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.82))
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(.ultraThinMaterial).environment(\.colorScheme, .dark))
+                .overlay(Circle().stroke(.white.opacity(0.16), lineWidth: 1))
+        }
+        .matchedGeometryEffect(id: "portrait-controls-toggle", in: portraitControlsTransition)
+        .accessibilityLabel("camera.controls.show".localized)
+    }
+
+    private func collapsePortraitControls() {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            portraitControlsCollapsed = true
+        }
     }
 
     // MARK: - Zoom Capsule
@@ -391,23 +456,23 @@ struct CameraView: View {
         .background(Capsule().fill(.ultraThinMaterial).environment(\.colorScheme, .dark))
     }
 
-    // MARK: - Capture Row (交换 + 拍摄按钮 + 镜像)
+    // MARK: - Capture Row (镜像 + 拍摄按钮 + 交换)
 
     private var captureRow: some View {
         HStack {
-            // 左：交换前后镜头
-            toolButton(icon: "arrow.triangle.2.circlepath") {
-                viewModel.swapPanels()
+            // 左：水平镜像翻转
+            toolButton(icon: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
+                viewModel.toggleMirror()
+                appSettings.frontCameraMirrored = viewModel.isFrontMirrored
             }
             .frame(maxWidth: .infinity)
 
             // 中：拍摄按钮
             captureButton
 
-            // 右：镜像翻转
-            toolButton(icon: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
-                viewModel.toggleMirror()
-                appSettings.frontCameraMirrored = viewModel.isFrontMirrored
+            // 右：交换前后摄画面
+            toolButton(icon: "arrow.triangle.2.circlepath") {
+                viewModel.swapPanels()
             }
             .frame(maxWidth: .infinity)
         }

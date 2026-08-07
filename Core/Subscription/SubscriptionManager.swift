@@ -15,15 +15,17 @@ enum ProProduct: String, CaseIterable {
 
 // MARK: - Pro Feature
 
-/// 需要 Pro 才能使用的功能（仅录像模式下的画中画和合拍）
+/// 需要 Pro 才能使用的功能
 enum ProFeature: String {
     case pipMode
     case duetMode
+    case appIcons
 
     var displayName: String {
         switch self {
         case .pipMode:   return "pro.feature.pipMode".localized
         case .duetMode:  return "pro.feature.duetMode".localized
+        case .appIcons:  return "pro.feature.appIcons".localized
         }
     }
 
@@ -31,6 +33,7 @@ enum ProFeature: String {
         switch self {
         case .pipMode:   return "pip"
         case .duetMode:  return "person.2.fill"
+        case .appIcons:  return "app.badge"
         }
     }
 }
