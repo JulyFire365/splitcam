@@ -1,0 +1,1 @@
+SplitCam 1.7 adds more app icons, a clearer 9:16 preview, and smarter capture-state memory. Create polished split-screen photos and videos with both cameras.
