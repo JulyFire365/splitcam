@@ -1,9 +1,9 @@
-What’s new in SplitCam:
+SplitCam 1.8:
 
-- New Space Saver video quality creates smaller files for easier sharing.
-- Choose from Space Saver, Standard, and HD, with estimated file sizes in Settings.
+- Inspired by your feedback: new Space Saver video quality records smaller files for easier sharing.
+- Choose Space Saver, Standard, or HD, and see estimated file sizes in Settings. Video quality settings do not change photo resolution.
 - Four new Pro app icons: Chrome, Terrazzo, Blueprint, and Bloom.
-- A redesigned SplitCam Pro page with an animated dual-lens header and clearer plan choices.
-- A simpler Settings page. Restore Purchases is available on the Pro page.
+- A redesigned SplitCam Pro page with an animated dual-lens header and clearer plan and billing details.
+- A simpler Settings page. Find Restore Purchases at the bottom of the Pro page.
 
-Thanks for using SplitCam!
+Thanks for helping us make SplitCam better!
