@@ -99,7 +99,7 @@ swiftc -module-cache-path /private/tmp/splitcam-swift-cache -parse-as-library Co
 
 ### Pro button and dock
 
-- Annual CTA: **按年订阅 / Subscribe Yearly**. An eligible free trial uses **免费试用 X 天 / Start X-Day Free Trial** instead. Monthly and Lifetime use their own subscription/purchase actions, not the generic unlock text.
+- Annual CTA: **按年订阅 / Subscribe Yearly**, with or without trial eligibility. The follow-up copy revision removes the trial-specific CTA: duration, subsequent price and auto-renewal are disclosed together only in the adjacent billing summary. Monthly and Lifetime retain their own subscription/purchase actions.
 - The selected full price, billing period, trial-to-paid transition where applicable, and auto-renewal disclosure remain directly beneath the CTA. StoreKit prices, eligibility checks, product IDs and offer configuration are unchanged. The annual card continues to show the full billed annual price, not a monthly equivalent.
 - A 24-point top-only gradient shadow fades into the scrolling region, is excluded from hit testing/accessibility, and does not darken the button. The dock remains fixed at ordinary Dynamic Type sizes.
 - Accessibility sizes place the purchase area in the same ScrollView as the plans to avoid a fixed footer occupying nearly the whole small screen. Legal links and CTA allow vertical wrapping. The revised top layout and complete accessibility labels were checked on iPhone SE at maximum size; the current native automation could not drive that SwiftUI ScrollView to the bottom. Manually verify touch scrolling to the CTA and all legal links on device.
@@ -107,3 +107,16 @@ swiftc -module-cache-path /private/tmp/splitcam-swift-cache -parse-as-library Co
 - Reference: Apple's [auto-renewable subscription presentation guidance](https://developer.apple.com/app-store/subscriptions/) and [App Review guideline 3.1.2(c)](https://developer.apple.com/app-store/review/guidelines/#subscriptions). These checks are not a guarantee of review approval.
 
 Final Debug simulator and Release iPhone builds passed; the compiled Release Info.plist remains 1.8 (9). A Release binary string check found none of `preview-screen`, `preview-no-trial`, `RecordingSaveChecks`, `recording-check` or `demo-front.png`. Localizations, metadata limits and `git diff --check` pass. Existing VideoComposer Swift 6 migration warnings remain; no new warnings from the repaired recording or paywall code were reported. No signing, upload or App Store submission was performed.
+
+### Annual CTA / trial disclosure deduplication
+
+The subsequent copy review removes `Start X-Day Free Trial` from the purchase button entirely. The button always names the selected action: **Subscribe Yearly / 按年订阅**, including for eligible trial users. The adjacent billing summary alone carries the trial duration, subsequent actual storefront price and auto-renewal statement. Ineligible users see only the ordinary recurring-price summary. The obsolete trial-button localization is removed from both languages.
+
+The general terms now say charges follow the selected plan, not that payment always occurs at purchase confirmation; this avoids contradicting a free trial. No product ID, price, eligibility check, trial configuration, StoreKit purchase operation or shadow/layout behavior changed.
+
+Apple's [subscription guidance](https://developer.apple.com/app-store/subscriptions/#attracting-subscribers) requires clear trial duration and post-trial pricing in the purchase flow. Keeping those together beside a concise subscription CTA is the design interpretation used here, not a claim of guaranteed review approval.
+
+- Native iPhone SE check, English trial-eligible: **Subscribe Yearly** fits in one line; **3 days free, then US$3.99/yr. Auto-renews until canceled.** is completely visible beneath it, with no second trial pitch in the button. [English capture](pro-yearly-trial-se-en.png).
+- Native Chinese trial-eligible: **按年订阅** and **免费试用 3 天，之后 US$3.99/年，自动续订，可随时取消。**. [Chinese capture](pro-yearly-trial-se-zh-Hans.png).
+- Simulator-only no-trial override: the same English CTA stays visible; the summary becomes **US$3.99/yr. Auto-renews until canceled.**, with no free offer. No purchase was performed. The displayed amount/duration are observations of this test storefront, not hard-coded values.
+- Debug Simulator and Release iPhone builds pass at 1.8 (9); string-table lint, metadata validation and whitespace checks pass. This copy-only follow-up does not expand the physical-device or transaction coverage listed above.

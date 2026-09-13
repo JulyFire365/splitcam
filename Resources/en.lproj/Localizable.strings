@@ -111,14 +111,13 @@
 "paywall.trialDays" = "Free trial for %@ days";
 "paywall.lifetimeDesc" = "Pay once, use forever";
 "paywall.selectPlan" = "Select Plan";
-"paywall.startTrial" = "Start %@-Day Free Trial";
 "paywall.buyNow" = "Buy Now %@";
 "paywall.subscribeNow" = "Subscribe Now %@";
 "paywall.subscribeYearly" = "Subscribe Yearly";
 "paywall.subscribeMonthly" = "Subscribe Monthly";
 "paywall.buyLifetime" = "Buy Lifetime Access";
 "paywall.restore" = "Restore Purchases";
-"paywall.terms" = "Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions in your App Store account settings.";
+"paywall.terms" = "Payments follow the selected plan and are charged to your Apple Account. Subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions in your App Store account settings.";
 "paywall.termsOfUse" = "Terms of Use";
 "paywall.privacyPolicy" = "Privacy Policy";
 

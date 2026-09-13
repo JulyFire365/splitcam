@@ -320,7 +320,8 @@ struct PaywallView: View {
 
     private var purchaseTitle: String {
         guard let product = selectedProduct else { return "paywall.selectPlan".localized }
-        if let days = eligibleTrialDays(product) { return "paywall.startTrial".localized("\(days)") }
+        // Name the commitment, not the introductory offer. Trial duration,
+        // subsequent price and renewal terms live together in billingSummary.
         switch product.id {
         case ProProduct.yearly.rawValue: return "paywall.subscribeYearly".localized
         case ProProduct.monthly.rawValue: return "paywall.subscribeMonthly".localized
