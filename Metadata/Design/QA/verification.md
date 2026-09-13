@@ -4,7 +4,7 @@
 
 - Debug iOS Simulator build and Release iPhone build: checked with Xcode 26.2 SDK / iOS 26.3 simulator. Code signing disabled for local builds; no upload performed.
 - Four new alternate icons are present in both build configurations and in the compiled app's CFBundleAlternateIcons dictionary. Final artwork is 1024 × 1024 with no alpha channel.
-- All 16 ASO boards are 1320 × 2868 sRGB PNGs without alpha; English and Simplified Chinese overviews were visually reviewed.
+- ASO boards were initially 1320 × 2868 (6.9-inch). The revised upload set targets the user's ASC 6.5-inch slot at 1284 × 2778, without alpha. The original-size raw app screenshots are internal inputs, not upload files.
 - Localized string tables and Info.plist pass plutil; git diff --check passes.
 - Existing VideoComposer Swift 6 sendability warnings remain; this project builds in Swift 5 language mode.
 - Release binary does not contain the Debug simulator screenshot routes or demo file names. Demo images stay under Metadata, outside the app bundle.
@@ -50,3 +50,13 @@ swift Tools/RenderASO.swift
 ```
 
 The renderer places native screenshots and local icon assets on new editorial layouts. Photo imagery is generated demonstration content; it is not a claim about real device output quality. Crops in boards 6–7 only enlarge existing native interface regions.
+
+## Revised 6.5-inch upload set
+
+The revised first five scenes use different outfits, expressions and settings. `Tools/CaptureASO.sh` copies each selected generated photo pair to the dedicated simulator and captures the actual app views in both languages; no camera UI is painted over. `source/scene-prompts.md` records the prompts. App source and release version are unchanged.
+
+`Tools/RenderASO.swift` uniformly fits the design into 1284 × 2778. Page counters are removed; ordered filenames remain. Only the eight PNGs inside each language directory are for upload, not overviews or raw captures.
+
+Run `swift Tools/ValidateASO.swift` to verify dimensions, opacity, color space and absence of page counters, including OCR near the former page-counter position.
+
+Final revision checks passed on 2026-09-13: all 16 upload PNGs are 1284 × 2778 opaque sRGB, no page counters were detected, and all 10 camera captures contain the expected nonblank demo content. Both language overviews were visually inspected. A clipped pet portrait was reframed as a landscape source and recaptured; screenshots taken before the app finished launching were replaced. The capture script now checks demo-frame readiness and retries instead of trusting a fixed startup delay. OCR validation needs access to macOS Vision services. These checks do not claim an ASC upload was performed.

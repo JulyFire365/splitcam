@@ -4,11 +4,12 @@ import AppKit
 
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let base = root.appendingPathComponent("Metadata/ASO/2026-09")
-let canvas = CGSize(width: 1320, height: 2868)
+// Match the user's ASC iPhone 6.5-inch slot, not the 6.9-inch slot.
+let canvas = CGSize(width: 1284, height: 2778)
+let designCanvas = CGSize(width: 1320, height: 2868)
 let ink = NSColor(srgbRed: 0.055, green: 0.065, blue: 0.08, alpha: 1)
 let paper = NSColor(srgbRed: 0.965, green: 0.95, blue: 0.915, alpha: 1)
 let teal = NSColor(srgbRed: 0.32, green: 0.85, blue: 0.82, alpha: 1)
-let orange = NSColor(srgbRed: 1, green: 0.61, blue: 0.30, alpha: 1)
 
 struct Slide {
     let screen: String
@@ -86,8 +87,15 @@ for (languageIndex, language) in ["en", "zh-Hans"].enumerated() {
         let highlight = dark ? teal : NSColor(srgbRed: 0.21, green: 0.28, blue: 0.83, alpha: 1)
         let bitmap = render(size: canvas) {
             background.setFill(); NSBezierPath(rect: CGRect(origin: .zero, size: canvas)).fill()
+            // Uniform fitting preserves faces, phone proportions, and typography.
+            // Fill the tiny side gutters with the same background, never stretch.
+            NSGraphicsContext.saveGraphicsState()
+            let scale = min(canvas.width / designCanvas.width, canvas.height / designCanvas.height)
+            let transform = NSAffineTransform()
+            transform.translateX(by: (canvas.width - designCanvas.width * scale) / 2, yBy: (canvas.height - designCanvas.height * scale) / 2)
+            transform.scale(by: scale)
+            transform.concat()
             text("SPLITCAM", x: 86, y: 86, width: 850, size: 30, color: foreground, weight: .bold, tracking: 6)
-            text(String(format: "%02d / 08", index + 1), x: 1070, y: 91, width: 220, size: 25, color: foreground.withAlphaComponent(0.55), weight: .medium)
             rounded(CGRect(x: 86, y: 165, width: 72, height: 7), radius: 3, fill: highlight)
             text(slide.title[languageIndex], x: 80, y: 232, width: 1190, size: languageIndex == 1 ? 118 : 114, color: foreground, weight: .bold, tracking: -3)
             text(slide.detail[languageIndex], x: 86, y: 535, width: 1160, size: 43, color: foreground.withAlphaComponent(0.72), weight: .regular)
@@ -134,19 +142,21 @@ for (languageIndex, language) in ["en", "zh-Hans"].enumerated() {
                 drawPhone(base.appendingPathComponent("raw/\(language)/\(slide.screen).png"), at: phone)
             }
             text(languageIndex == 0 ? "TWO PERSPECTIVES. ONE STORY." : "双重视角，让故事更完整。", x: 86, y: 2810, width: 1160, size: 22, color: foreground.withAlphaComponent(0.5), weight: .medium, tracking: 2)
+            NSGraphicsContext.restoreGraphicsState()
         }
+        precondition(bitmap.pixelsWide == 1284 && bitmap.pixelsHigh == 2778 && !bitmap.hasAlpha, "Invalid ASC upload image")
         let output = base.appendingPathComponent("\(language)/\(String(format: "%02d", index + 1))-\(slide.screen).png")
         try bitmap.representation(using: .png, properties: [:])!.write(to: output)
         paths.append(output)
     }
     let contact = render(size: CGSize(width: 1440, height: 1630)) {
         paper.setFill(); NSBezierPath(rect: CGRect(x: 0, y: 0, width: 1440, height: 1630)).fill()
-        text(languageIndex == 0 ? "SplitCam / A fresh perspective" : "SplitCam / 全新双视角叙事", x: 28, y: 26, width: 1380, size: 28, color: ink, weight: .bold)
+        text(languageIndex == 0 ? "SplitCam / iPhone 6.5-inch / 1284 × 2778" : "SplitCam / iPhone 6.5 英寸 / 1284 × 2778", x: 28, y: 26, width: 1380, size: 28, color: ink, weight: .bold)
         for (i, path) in paths.enumerated() {
-            let rect = CGRect(x: CGFloat(24 + (i % 4) * 355), y: CGFloat(90 + (i / 4) * 764), width: 327, height: 710.7)
+            let rect = CGRect(x: CGFloat(24 + (i % 4) * 355), y: CGFloat(90 + (i / 4) * 764), width: 327, height: 327 * canvas.height / canvas.width)
             NSImage(contentsOf: path)!.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
         }
     }
     try contact.representation(using: .png, properties: [:])!.write(to: base.appendingPathComponent("overview-\(language).png"))
 }
-print("Rendered 16 ASO boards and 2 overviews in \(base.path)")
+print("Rendered 16 opaque 1284 × 2778 ASO boards for iPhone 6.5-inch and 2 review-only overviews in \(base.path)")
