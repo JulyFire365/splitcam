@@ -646,13 +646,28 @@ final class CameraViewModel: ObservableObject {
     }
 
     private func refreshPendingVideoSaves() {
-        pendingVideoURLs = Array(Set(pendingVideoURLs.filter { FileManager.default.fileExists(atPath: $0.path) }
-                                    + pendingVideoStore.pendingURLs()))
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        var seenPaths = Set<String>()
+        pendingVideoURLs = (pendingVideoURLs + pendingVideoStore.pendingURLs())
+            .filter { url in
+                let path = url.standardizedFileURL.path
+                return FileManager.default.isReadableFile(atPath: path) && seenPaths.insert(path).inserted
+            }
+            .sorted { $0.standardizedFileURL.path < $1.standardizedFileURL.path }
         pendingVideoCount = pendingVideoURLs.count
     }
 
+    private func removePendingVideo(_ url: URL) {
+        let path = url.standardizedFileURL.path
+        pendingVideoURLs.removeAll {
+            $0.standardizedFileURL.path == path || !FileManager.default.isReadableFile(atPath: $0.path)
+        }
+        refreshPendingVideoSaves()
+    }
+
     func retryPendingVideoSaves() {
+        // A completed Photos save may have already removed the local retry copy.
+        // Reconcile first so a stale badge cannot produce a misleading error.
+        refreshPendingVideoSaves()
         guard !isRecording, !isProcessing, hasPendingVideoSaves else { return }
         isProcessing = true
         photoAccessDenied = false
@@ -676,8 +691,7 @@ final class CameraViewModel: ObservableObject {
                 try await albumSaver.save(url)
                 if let thumbnail { lastSavedThumbnail = UIImage(cgImage: thumbnail) }
                 pendingVideoStore.markSaved(url)
-                pendingVideoURLs.removeAll { $0 == url }
-                pendingVideoCount = pendingVideoURLs.count
+                removePendingVideo(url)
                 ReviewPromptManager.shared.recordSuccessfulCreation()
                 ReviewPromptManager.shared.queueAfterSuccessfulCreation()
             } catch {
@@ -689,9 +703,10 @@ final class CameraViewModel: ObservableObject {
                 case VideoAlbumSaveError.permissionRestricted:
                     errorMessage = "error.videoPhotosRestricted".localized
                 case VideoAlbumSaveError.missingFile:
-                    pendingVideoURLs.removeAll { $0 == url }
-                    pendingVideoCount = pendingVideoURLs.count
-                    errorMessage = "error.videoFileMissing".localized
+                    // The primary save may already have succeeded while a stale
+                    // in-memory reference survived. Nothing remains to retry.
+                    removePendingVideo(url)
+                    continue
                 default:
                     errorMessage = "error.videoAlbumSave".localized
                 }

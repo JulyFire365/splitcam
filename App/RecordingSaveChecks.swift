@@ -86,6 +86,17 @@ private struct CheckFailure: Error, CustomStringConvertible {
             try require(store.pendingURLs().isEmpty, "Saved file still queued")
             lines.append("PASS retry succeeds without re-recording; thumbnail and cleanup confirmed")
 
+            let staleStaging = try store.makeRecordingURL()
+            try Data([0x00]).write(to: staleStaging)
+            let staleReady = try store.markReady(staleStaging)
+            model = CameraViewModel(pendingVideoStore: store, albumSaver: .init(library: library))
+            try require(model.pendingVideoCount == 1, "Stale fixture not loaded")
+            try FileManager.default.removeItem(at: staleReady)
+            model.showError = false
+            model.retryPendingVideoSaves()
+            try require(model.pendingVideoCount == 0 && !model.showError, "Stale retry reference was not cleared silently")
+            lines.append("PASS stale retry badge clears silently when its local file is gone")
+
             prepareModel()
             for _ in 0..<2 { try await recordFixture() }
             try require(library.writes == 3 && model.pendingVideoCount == 0, "Subsequent recordings failed")

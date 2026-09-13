@@ -148,7 +148,6 @@
 "error.videoPhotosPermission" = "请在系统设置中允许 SplitCam 添加视频到相册，再点击“重试保存”。视频已保留在 SplitCam 中。";
 "error.videoPhotosRestricted" = "此设备限制了向相册添加内容。视频已保留在 SplitCam 中，解除限制后可重试保存。";
 "error.videoAlbumSave" = "视频已保留在 SplitCam 中，但未能写入系统相册。请点击“重试保存”，无需重新录制。";
-"error.videoFileMissing" = "找不到视频文件，请重新录制。";
 "video.retrySave" = "重试保存";
 "video.openSettings" = "打开设置";
 "video.saving" = "正在保存视频…";

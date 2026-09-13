@@ -148,7 +148,6 @@
 "error.videoPhotosPermission" = "Allow SplitCam to add videos to Photos in Settings, then tap Retry. Your video is kept in SplitCam.";
 "error.videoPhotosRestricted" = "Adding to Photos is restricted on this device. Your video is kept in SplitCam and can be retried when access is available.";
 "error.videoAlbumSave" = "Your video is kept in SplitCam, but could not be added to Photos. Tap Retry to save it again.";
-"error.videoFileMissing" = "The video file could not be found. Please record again.";
 "video.retrySave" = "Retry Save";
 "video.openSettings" = "Open Settings";
 "video.saving" = "Saving video…";
