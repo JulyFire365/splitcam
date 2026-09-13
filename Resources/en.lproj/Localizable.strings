@@ -112,10 +112,11 @@
 "paywall.lifetimeDesc" = "Pay once, use forever";
 "paywall.selectPlan" = "Select Plan";
 "paywall.startTrial" = "Start %@-Day Free Trial";
-"paywall.startYearlyTrial" = "%@-Day Free Trial, Then %@/Year Auto-Renews";
 "paywall.buyNow" = "Buy Now %@";
 "paywall.subscribeNow" = "Subscribe Now %@";
-"paywall.subscribeYearly" = "Subscribe %@/Year (Auto-Renews)";
+"paywall.subscribeYearly" = "Subscribe Yearly";
+"paywall.subscribeMonthly" = "Subscribe Monthly";
+"paywall.buyLifetime" = "Buy Lifetime Access";
 "paywall.restore" = "Restore Purchases";
 "paywall.terms" = "Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless it is canceled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscriptions in your App Store account settings.";
 "paywall.termsOfUse" = "Terms of Use";
@@ -143,6 +144,16 @@
 "error.recordingInit" = "Recording initialization failed";
 "error.videoSaveFailed" = "Failed to save video";
 "error.saveFailed" = "Save failed";
+"error.videoEncoding" = "This recording could not be completed. Please try recording again.";
+"error.videoNoFrames" = "No video frames were captured. Wait for both cameras to be ready, then record again.";
+"error.videoPhotosPermission" = "Allow SplitCam to add videos to Photos in Settings, then tap Retry. Your video is kept in SplitCam.";
+"error.videoPhotosRestricted" = "Adding to Photos is restricted on this device. Your video is kept in SplitCam and can be retried when access is available.";
+"error.videoAlbumSave" = "Your video is kept in SplitCam, but could not be added to Photos. Tap Retry to save it again.";
+"error.videoFileMissing" = "The video file could not be found. Please record again.";
+"video.retrySave" = "Retry Save";
+"video.openSettings" = "Open Settings";
+"video.saving" = "Saving video…";
+"video.pendingCount" = "%@ videos waiting to save";
 
 /* ===== Export ===== */
 "export.back" = "Back";

@@ -7,7 +7,7 @@ struct CameraView: View {
 
     @EnvironmentObject var coordinator: AppCoordinator
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var viewModel = CameraViewModel()
+    @StateObject private var viewModel: CameraViewModel
     @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
@@ -18,6 +18,11 @@ struct CameraView: View {
     @State private var showFocusIndicator = false
     @State private var portraitControlsCollapsed = false
     @Namespace private var portraitControlsTransition
+
+    init(mode: CaptureMode, viewModel: CameraViewModel? = nil) {
+        self.mode = mode
+        _viewModel = StateObject(wrappedValue: viewModel ?? CameraViewModel())
+    }
 
     var body: some View {
         ZStack {
@@ -126,6 +131,16 @@ struct CameraView: View {
             }
         }
         .alert("error".localized, isPresented: $viewModel.showError) {
+            if viewModel.hasPendingVideoSaves {
+                Button("video.retrySave".localized) { viewModel.retryPendingVideoSaves() }
+            }
+            if viewModel.photoAccessDenied {
+                Button("video.openSettings".localized) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            }
             Button("ok".localized, role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage)
@@ -648,11 +663,12 @@ struct CameraView: View {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(.white)
-                Text("processing".localized)
+                Text("video.saving".localized)
                     .font(.subheadline)
                     .foregroundColor(.white)
             }
         }
+        .accessibilityIdentifier("camera.savingVideo")
     }
 
     // MARK: - Pro Feature Indicator
@@ -730,6 +746,22 @@ struct CameraView: View {
 
     private var mediaActions: some View {
         HStack(spacing: 8) {
+            if viewModel.hasPendingVideoSaves {
+                toolButton(icon: "arrow.clockwise") { viewModel.retryPendingVideoSaves() }
+                    .overlay(alignment: .topTrailing) {
+                        Text(viewModel.pendingVideoCount > 9 ? "9+" : "\(viewModel.pendingVideoCount)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(4)
+                            .background(.orange, in: Circle())
+                            .allowsHitTesting(false)
+                    }
+                    .disabled(viewModel.isRecording || viewModel.isProcessing)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("video.retrySave".localized)
+                    .accessibilityValue("video.pendingCount".localized("\(viewModel.pendingVideoCount)"))
+                    .accessibilityIdentifier("camera.retryVideoSave")
+            }
             toolButton(icon: "gearshape") { showSettings = true }
                 .accessibilityLabel("settings.title".localized)
 

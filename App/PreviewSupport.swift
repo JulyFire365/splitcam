@@ -13,7 +13,7 @@ enum ScreenshotSupport {
     static var documents: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
 
     @MainActor static func prepareCamera(_ model: CameraViewModel) -> Bool {
-        guard let screen, ["split", "stack", "pip", "portrait", "duet"].contains(screen) else { return false }
+        guard let screen, ["split", "stack", "pip", "portrait", "duet", "recording-check"].contains(screen) else { return false }
         model.camerasReady = true
         model.shootingMode = .video
         model.aspectRatio = screen == "portrait" ? .ratio9_16 : .ratio3_4
@@ -55,6 +55,7 @@ struct ScreenshotPreviewRoot: View {
     var body: some View {
         Group {
             switch ScreenshotSupport.screen {
+            case "recording-check": RecordingSaveCheckView()
             case "paywall": PaywallView(triggeredBy: .pipMode)
             case "settings": SettingsView(settings: .shared)
             case "icons": NavigationStack { AppIconPickerView(settings: .shared) }.preferredColorScheme(.dark)

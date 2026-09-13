@@ -111,11 +111,12 @@
 "paywall.trialDays" = "免费试用 %@ 天";
 "paywall.lifetimeDesc" = "一次付费，永久使用";
 "paywall.selectPlan" = "选择方案";
-"paywall.startTrial" = "开始 %@ 天免费试用";
-"paywall.startYearlyTrial" = "免费试用 %@ 天，随后 %@/年自动续订";
+"paywall.startTrial" = "免费试用 %@ 天";
 "paywall.buyNow" = "立即购买 %@";
 "paywall.subscribeNow" = "立即订阅 %@";
-"paywall.subscribeYearly" = "订阅 %@/年自动续订";
+"paywall.subscribeYearly" = "按年订阅";
+"paywall.subscribeMonthly" = "按月订阅";
+"paywall.buyLifetime" = "一次性购买";
 "paywall.restore" = "恢复购买";
 "paywall.terms" = "确认购买后，将向您的 Apple ID 账户收取费用。订阅将自动续费，除非在当前订阅期结束前至少 24 小时取消。您的账户将在当前订阅期结束前 24 小时内被收取续费费用。您可以在 App Store 账户设置中管理和取消订阅。";
 "paywall.termsOfUse" = "使用条款";
@@ -143,6 +144,16 @@
 "error.recordingInit" = "录制初始化失败";
 "error.videoSaveFailed" = "视频保存失败";
 "error.saveFailed" = "保存失败";
+"error.videoEncoding" = "这段视频未能完成录制，请重新录制。";
+"error.videoNoFrames" = "未录到有效画面。请等待两个镜头就绪后，再开始录制。";
+"error.videoPhotosPermission" = "请在系统设置中允许 SplitCam 添加视频到相册，再点击“重试保存”。视频已保留在 SplitCam 中。";
+"error.videoPhotosRestricted" = "此设备限制了向相册添加内容。视频已保留在 SplitCam 中，解除限制后可重试保存。";
+"error.videoAlbumSave" = "视频已保留在 SplitCam 中，但未能写入系统相册。请点击“重试保存”，无需重新录制。";
+"error.videoFileMissing" = "找不到视频文件，请重新录制。";
+"video.retrySave" = "重试保存";
+"video.openSettings" = "打开设置";
+"video.saving" = "正在保存视频…";
+"video.pendingCount" = "%@ 段视频等待保存";
 
 /* ===== 导出页面 ===== */
 "export.back" = "返回";

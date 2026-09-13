@@ -224,14 +224,6 @@ struct VideoQualityPickerView: View {
     var body: some View {
         List {
             Section {
-                Text("quality.scope".localized)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-            }
-            Section {
                 ForEach(ResolutionQuality.allCases, id: \.self) { quality in
                     Button {
                         settings.defaultVideoQuality = quality
@@ -275,6 +267,17 @@ struct VideoQualityPickerView: View {
                     .accessibilityIdentifier("videoQuality.\(quality.rawValue)")
                     .accessibilityAddTraits(quality == settings.defaultVideoQuality ? .isSelected : [])
                 }
+            } header: {
+                // A grouped list row clips to rounded corners, even with a clear
+                // background. Keep prose outside the cell, with native safe insets.
+                Text("quality.scope".localized)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 8)
+                    .accessibilityIdentifier("videoQuality.scope")
             } footer: {
                 Text("quality.footer".localized)
             }

@@ -39,12 +39,18 @@ struct PaywallView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
                     .padding(.bottom, 20)
+                    // A large-text dock can fill a small screen by itself.
+                    // Keep every plan and disclosure reachable in one scroll.
+                    if dynamicTypeSize.isAccessibilitySize { purchaseDock }
                 }
                 .frame(maxWidth: .infinity)
             }
+            .accessibilityIdentifier("paywall.content")
             .background(paper.ignoresSafeArea())
             .ignoresSafeArea(.container, edges: .top)
-            .safeAreaInset(edge: .bottom, spacing: 0) { purchaseDock }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !dynamicTypeSize.isAccessibilitySize { purchaseDock }
+            }
             .overlay(alignment: .topTrailing) { closeButton }
         }
         .preferredColorScheme(.light)
@@ -232,7 +238,10 @@ struct PaywallView: View {
                 HStack {
                     Spacer(minLength: 0)
                     if busy { ProgressView().tint(.white) } else {
-                        Text(purchaseTitle).font(.headline).multilineTextAlignment(.center)
+                        Text(purchaseTitle)
+                            .font(.headline)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
                         Image(systemName: "arrow.right").font(.subheadline.weight(.semibold))
                     }
                     Spacer(minLength: 0)
@@ -242,10 +251,12 @@ struct PaywallView: View {
                 .opacity(selectedProduct == nil ? 0.45 : 1)
             }
             .disabled(selectedProduct == nil || busy)
+            .accessibilityIdentifier("paywall.purchase")
             if let product = selectedProduct {
                 Text(billingSummary(product))
                     .font(.caption).foregroundStyle(ink.opacity(0.65))
                     .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("paywall.billingSummary")
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 20) { legalLinks }
@@ -257,7 +268,19 @@ struct PaywallView: View {
         .padding(.top, 14).padding(.bottom, 8).frame(maxWidth: .infinity)
         .background {
             paper.ignoresSafeArea(.container, edges: .bottom)
-                .shadow(color: .black.opacity(0.05), radius: 12, y: -5)
+                .overlay(alignment: .top) {
+                    // A top-only shadow fades into the scroll area without
+                    // darkening the purchase controls or intercepting gestures.
+                    LinearGradient(stops: [
+                        .init(color: ink.opacity(0), location: 0),
+                        .init(color: ink.opacity(0.025), location: 0.4),
+                        .init(color: ink.opacity(0.09), location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 24)
+                    .offset(y: -24)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                }
         }
     }
 
@@ -270,9 +293,13 @@ struct PaywallView: View {
                 isRestoring = false
                 if manager.errorMessage == nil { showRestoreResult = true }
             }
-        }.disabled(busy)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .disabled(busy)
         Link("paywall.termsOfUse".localized, destination: URL(string: "https://splitcam-legal.vercel.app/terms-of-use.html")!)
+            .fixedSize(horizontal: false, vertical: true)
         Link("paywall.privacyPolicy".localized, destination: URL(string: "https://splitcam-legal.vercel.app/privacy-policy.html")!)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func selectDefaultProduct() {
@@ -281,6 +308,12 @@ struct PaywallView: View {
     }
 
     private func eligibleTrialDays(_ product: Product) -> Int? {
+#if DEBUG && targetEnvironment(simulator)
+        // Exercise the returning-customer UI without buying a product or
+        // changing StoreKit eligibility. This override is absent from Release.
+        if ScreenshotSupport.screen == "paywall",
+           ProcessInfo.processInfo.arguments.contains("-preview-no-trial") { return nil }
+#endif
         guard trialEligibility[product.id] == true else { return nil }
         return product.freeTrialDays
     }
@@ -288,7 +321,12 @@ struct PaywallView: View {
     private var purchaseTitle: String {
         guard let product = selectedProduct else { return "paywall.selectPlan".localized }
         if let days = eligibleTrialDays(product) { return "paywall.startTrial".localized("\(days)") }
-        return "paywall.unlock".localized
+        switch product.id {
+        case ProProduct.yearly.rawValue: return "paywall.subscribeYearly".localized
+        case ProProduct.monthly.rawValue: return "paywall.subscribeMonthly".localized
+        case ProProduct.lifetime.rawValue: return "paywall.buyLifetime".localized
+        default: return "paywall.unlock".localized
+        }
     }
 
     private func billingSummary(_ product: Product) -> String {

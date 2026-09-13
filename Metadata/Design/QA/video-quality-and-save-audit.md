@@ -17,7 +17,7 @@ The baseline simulator build already synchronized the setting and accepted a rig
 
 The user reported the first video failing to save and a second attempt succeeding. No device log, exact alert screenshot, duration, quality or permission-prompt sequence has been supplied yet. Simulator UI checks and standalone HEVC encoding are not a physical dual-camera reproduction.
 
-### Confirmed code risks in the existing recording path
+### Confirmed code risks in the pre-repair recording path
 
 1. The camera screen's `error.videoSaveFailed` ("Failed to save video") is raised in `CameraViewModel.stopRecording()` when writer completion is not `.completed`. It is not raised by the photo-library completion handler. Permission denial therefore does not directly explain that exact alert in this path.
 2. Camera callbacks append video/audio on CameraEngine's serial `dataOutputQueue`, but stop marks inputs finished and calls `finishWriting` from the main actor. `composeAndWriteFrame` can still run while writer status is `.writing`; it is not gated by the UI's `isRecording` flag. The separately declared `recordingQueue` is unused. Apple requires finalization to occur after all append calls have returned: [finishWriting documentation](https://developer.apple.com/documentation/avfoundation/avassetwriter/finishwriting(completionhandler:)).
@@ -25,14 +25,22 @@ The user reported the first video failing to save and a second attempt succeedin
 4. `startWriting`, video append and audio append results are ignored; the failure message discards the writer's underlying error. `isWritingStarted` records session start, not successful frame append, so the current empty-recording guard cannot establish that a video frame was accepted.
 5. Photo-library authorization denial and `performChanges` errors are currently swallowed. These are separate save-feedback defects, not evidence that the reported alert was caused by authorization.
 
-These are credible causes of intermittent failure, but do not prove why this particular first attempt failed. They are not fixed by the quality UI/state change.
+These are credible causes of intermittent failure, but do not prove why this particular first attempt failed. The initial quality-only change did not address them; the authorized follow-up below does.
 
-### Proposed follow-up repair (awaiting scope confirmation)
+### Authorized follow-up repair implemented
 
-- Serialize writer creation, append, stop and finalization on one owned queue; stop accepting samples before marking inputs finished.
-- Bind each completion to its own recording context and hold a finishing/saving state until it is safe to start again.
-- Check writer setup/append results, track accepted video frames and keep diagnostic stage + NSError domain/code/underlying error (no user media).
-- Separate encoding failures, photo-library authorization denial and photo-library write failures. Preserve an encoded file if album saving fails so retry is possible.
-- Reproduce on a supported physical device: fresh install / first Photos authorization, short and normal clips, all quality presets, rapid stop/start, background transitions, denial and re-enable. Verify playable output and audio/video sync.
+- `VideoRecordingSession` owns creation, appends and finalization on one serial queue. Stop waits for in-flight appends, closes the sample gate, then finishes the captured writer. Recording IDs keep stale completions from affecting another recording. Output dimensions are immutable for each recording.
+- `CameraRecordingComposer` snapshots layout and camera frames behind a lock; composition runs on the writer queue instead of reading main-actor view-model state from capture callbacks. Its layout/fit/mask geometry is preserved.
+- The camera stays in a finishing/saving state until the asynchronous operation settles; new capture is blocked in that state. Empty recordings have a distinct error, and single-frame clips have a positive duration.
+- Writer setup and append results are checked. `VideoSave` diagnostics record stage, accepted-frame count and NSError domain/code/underlying codes, never media, filenames, URLs or error userInfo.
+- `VideoAlbumSaver` distinguishes denied/restricted Photos access from album write failures. Finalized files are retained under Application Support until Photos confirms success. The alert and a counted camera action support retry without re-recording; pending files are rediscovered after relaunch.
+- A background task covers finalization/saving. A playable staging file left between encoding and its ready rename is recovered on next setup. This is bounded background time, not a guarantee against the OS terminating an in-progress encode.
 
-Do not mark the reported first-save problem resolved or the release fully verified until this investigation / repair has been completed on device.
+### Regression evidence and remaining limits
+
+- `Tools/ValidateRecordingSave.swift` passed real HEVC/AAC encode/decode at all three qualities, 12 consecutive single-frame recordings, empty recording rejection, an append held in flight while stop is requested, late-frame rejection, stale finish isolation and existing-file protection.
+- Its injected Photos adapter passed first authorization granted/denied, restricted access, write failure, durable retention, completed staging recovery and successful retry/cleanup. It does not write to the real photo library.
+- The simulator-only `-preview-screen recording-check` harness passed the production CameraEngine callback → composer → writer → view-model save flow with synthetic frames. It verified processing locks, denial, model recreation, album failure, retry, thumbnail creation and subsequent recordings. The real camera alert's Retry Save action was tapped and its pending badge disappeared on success.
+- Still required on a supported physical device: fresh-install first Photos authorization, short/normal clips, all quality presets, rapid stop/start, background transitions, denial/re-enable, playable outputs and audio/video sync, including PiP/duet.
+
+The identified code risks are repaired and the automated/simulator regressions pass. The original incident's exact cause is not proven; do not describe a physical-device first-save regression as passed until it is actually run.

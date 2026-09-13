@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E60013 /* RecordingSaveChecks.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60014; };
+		E60007 /* VideoRecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60008; };
+		E60009 /* CameraRecordingComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60010; };
+		E60011 /* VideoAlbumSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60012; };
 		E60005 /* PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60006; };
 		E60001 /* VideoQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60002; };
 		E60003 /* ProHeroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60004; };
@@ -46,6 +50,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E60014 /* RecordingSaveChecks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSaveChecks.swift; sourceTree = "<group>"; };
+		E60008 /* VideoRecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecordingSession.swift; sourceTree = "<group>"; };
+		E60010 /* CameraRecordingComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraRecordingComposer.swift; sourceTree = "<group>"; };
+		E60012 /* VideoAlbumSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAlbumSaver.swift; sourceTree = "<group>"; };
 		E60006 /* PreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSupport.swift; sourceTree = "<group>"; };
 		E60002 /* VideoQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoQuality.swift; sourceTree = "<group>"; };
 		E60004 /* ProHeroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProHeroView.swift; sourceTree = "<group>"; };
@@ -140,6 +148,7 @@
 			children = (
 				B10001 /* SplitCamApp.swift */,
 				E60006 /* PreviewSupport.swift */,
+				E60014 /* RecordingSaveChecks.swift */,
 				B10002 /* AppCoordinator.swift */,
 				E50002 /* ReviewPromptManager.swift */,
 				E50004 /* AppSettings.swift */,
@@ -213,6 +222,8 @@
 			children = (
 				B10003 /* CameraEngine.swift */,
 				E60002 /* VideoQuality.swift */,
+				E60008 /* VideoRecordingSession.swift */,
+				E60010 /* CameraRecordingComposer.swift */,
 			);
 			path = CameraEngine;
 			sourceTree = "<group>";
@@ -294,6 +305,7 @@
 			isa = PBXGroup;
 			children = (
 				B10022 /* MediaStore.swift */,
+				E60012 /* VideoAlbumSaver.swift */,
 			);
 			path = MediaStore;
 			sourceTree = "<group>";
@@ -409,6 +421,7 @@
 			files = (
 				A10001 /* SplitCamApp.swift in Sources */,
 				E60005 /* PreviewSupport.swift in Sources */,
+				E60013 /* RecordingSaveChecks.swift in Sources */,
 				A10002 /* AppCoordinator.swift in Sources */,
 				A10003 /* CameraEngine.swift in Sources */,
 				A10004 /* SplitLayoutEngine.swift in Sources */,
@@ -432,6 +445,9 @@
 				A10023 /* SubscriptionManager.swift in Sources */,
 				A10024 /* PaywallView.swift in Sources */,
 				E60001 /* VideoQuality.swift in Sources */,
+				E60007 /* VideoRecordingSession.swift in Sources */,
+				E60009 /* CameraRecordingComposer.swift in Sources */,
+				E60011 /* VideoAlbumSaver.swift in Sources */,
 				E60003 /* ProHeroView.swift in Sources */,
 				A10025 /* String+L10n.swift in Sources */,
 				E50001 /* ReviewPromptManager.swift in Sources */,

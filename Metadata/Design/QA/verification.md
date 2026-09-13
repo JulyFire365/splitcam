@@ -72,4 +72,38 @@ Final revision checks passed on 2026-09-13: all 16 upload PNGs are 1284 × 2778 
 - Re-ran the real HEVC harness: all four size mappings pass; Low / Standard / High encode and decode successfully with the same file-size results recorded above. This does not test the real camera's concurrent stop/finalize path.
 - Recaptured the four affected bilingual Settings / Quality raw screenshots; the quality board crop includes the new scope explanation and footer.
 
-The reported first-save failure remains under investigation. No fix to the recording finalization / Photos save pipeline is claimed in this revision.
+That initial quality-only revision did not change the recording finalization / Photos save pipeline. The authorized follow-up below addresses the confirmed code risks; the exact original incident still requires device evidence.
+
+## Recording/save repair and final UI follow-up (2026-09-13)
+
+### Recording/save regression
+
+Run the production writer and storage harness on macOS:
+
+```sh
+swiftc -module-cache-path /private/tmp/splitcam-swift-cache -parse-as-library Core/CameraEngine/VideoRecordingSession.swift Core/CameraEngine/VideoQuality.swift Core/MediaStore/VideoAlbumSaver.swift Shared/Extensions/String+L10n.swift Tools/ValidateRecordingSave.swift -o /private/tmp/splitcam-recording-save-validation
+/private/tmp/splitcam-recording-save-validation
+```
+
+- Passed all three HEVC quality outputs (720 × 960 for Low, 1080 × 1440 for Standard/High), positive duration and decoding, including AAC audio.
+- Passed empty capture handling, 12 consecutive single-frame recordings, stop with an append in flight, rejection of late samples, stale completion isolation, and protection of existing files.
+- The fake Photos adapter exercised first grant/denial, restrictions, write errors, retained/recovered files and successful retry. No real Photos data was written by this harness.
+- The Debug simulator route `-preview-screen recording-check` exercised actual CameraEngine callbacks, `CameraRecordingComposer`, `VideoRecordingSession` and `CameraViewModel` with synthetic frames. All checks passed: processing locks, first denial, retained file after model recreation, write failure, retry, thumbnail, cleanup and subsequent recordings. Native tapping of Retry Save removed the alert and pending-save badge after the test adapter succeeded.
+- This does not replace fresh-install, multi-camera, background-transition and audio/video-sync checks on a supported physical device. See the [updated investigation](video-quality-and-save-audit.md).
+
+### Clipped quality explanation
+
+- Moved the scope text out of the transparent zero-inset rounded list row and into the option section's native header, with native horizontal insets and unrestricted vertical wrapping.
+- Verified the actual camera → Video Quality sheet on iPhone SE (3rd generation), English, at standard and the largest accessibility text size. The entire sentence is visible and wraps without clipping the initial letters. [Standard-size capture](quality-scope-se-en.png).
+- Recaptured the bilingual native quality screenshots and re-rendered the affected quality boards and overview sheets. All 16 upload boards pass the 1284 × 2778 / opaque sRGB / no-page-counter validator. Both updated quality boards were visually reviewed.
+
+### Pro button and dock
+
+- Annual CTA: **按年订阅 / Subscribe Yearly**. An eligible free trial uses **免费试用 X 天 / Start X-Day Free Trial** instead. Monthly and Lifetime use their own subscription/purchase actions, not the generic unlock text.
+- The selected full price, billing period, trial-to-paid transition where applicable, and auto-renewal disclosure remain directly beneath the CTA. StoreKit prices, eligibility checks, product IDs and offer configuration are unchanged. The annual card continues to show the full billed annual price, not a monthly equivalent.
+- A 24-point top-only gradient shadow fades into the scrolling region, is excluded from hit testing/accessibility, and does not darken the button. The dock remains fixed at ordinary Dynamic Type sizes.
+- Accessibility sizes place the purchase area in the same ScrollView as the plans to avoid a fixed footer occupying nearly the whole small screen. Legal links and CTA allow vertical wrapping. The revised top layout and complete accessibility labels were checked on iPhone SE at maximum size; the current native automation could not drive that SwiftUI ScrollView to the bottom. Manually verify touch scrolling to the CTA and all legal links on device.
+- Verified native Chinese trial, monthly and lifetime selections; English no-trial annual state and its complete renewal disclosure. [English annual/no-trial capture](pro-yearly-no-trial-en.png), [Chinese annual/no-trial on iPhone SE](pro-yearly-se-zh-Hans.png). The no-trial snapshots use the simulator-only `-preview-no-trial` override, not a purchase or a change to the account's eligibility. No transaction or restore was performed.
+- Reference: Apple's [auto-renewable subscription presentation guidance](https://developer.apple.com/app-store/subscriptions/) and [App Review guideline 3.1.2(c)](https://developer.apple.com/app-store/review/guidelines/#subscriptions). These checks are not a guarantee of review approval.
+
+Final Debug simulator and Release iPhone builds passed; the compiled Release Info.plist remains 1.8 (9). A Release binary string check found none of `preview-screen`, `preview-no-trial`, `RecordingSaveChecks`, `recording-check` or `demo-front.png`. Localizations, metadata limits and `git diff --check` pass. Existing VideoComposer Swift 6 migration warnings remain; no new warnings from the repaired recording or paywall code were reported. No signing, upload or App Store submission was performed.

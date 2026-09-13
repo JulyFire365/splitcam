@@ -54,8 +54,6 @@ final class CameraViewModel: ObservableObject {
     // Duet mode recording support
     private var importedVideoOutput: AVPlayerItemVideoOutput?
     private var importedCIImage: CIImage?
-    private var recIsDuetMode: Bool = false
-    private var latestImportedCIImage: CIImage?
     private var importedVideoOrientation: CGImagePropertyOrientation = .up
 
     var isDuetMode: Bool {
@@ -70,64 +68,30 @@ final class CameraViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var layoutPersistenceCancellables = Set<AnyCancellable>()
 
-    // MARK: - Real-time Composed Recording
+    // MARK: - Recording and Save Lifecycle
 
-    private let recordingQueue = DispatchQueue(label: "com.splitcam.recording")
-    private var composedWriter: AVAssetWriter?
-    private var composedVideoInput: AVAssetWriterInput?
-    private var composedAudioInput: AVAssetWriterInput?
-    private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
-    private var composedOutputURL: URL?
-    private var recordingCIContext: CIContext = {
-        // Metal GPU 加速，实时渲染优先性能
-        if let device = MTLCreateSystemDefaultDevice() {
-            return CIContext(mtlDevice: device, options: [
-                .useSoftwareRenderer: false,
-                .priorityRequestLow: false
-            ])
-        }
-        return CIContext(options: [.useSoftwareRenderer: false])
-    }()
-    private var recordingStartTime: CMTime?
-    private var isWritingStarted = false
-
-    // 最新帧缓存（录制用，通过 bufferLock 保护线程安全）
-    private let bufferLock = NSLock()
-    private var _latestFrontPixelBuffer: CVPixelBuffer?
-    private var _latestBackPixelBuffer: CVPixelBuffer?
-
-    private func setFrontBuffer(_ buffer: CVPixelBuffer?) {
-        bufferLock.lock()
-        _latestFrontPixelBuffer = buffer
-        bufferLock.unlock()
-    }
-    private func setBackBuffer(_ buffer: CVPixelBuffer?) {
-        bufferLock.lock()
-        _latestBackPixelBuffer = buffer
-        bufferLock.unlock()
-    }
-    private func getBuffers() -> (front: CVPixelBuffer?, back: CVPixelBuffer?) {
-        bufferLock.lock()
-        let f = _latestFrontPixelBuffer
-        let b = _latestBackPixelBuffer
-        bufferLock.unlock()
-        return (f, b)
-    }
-
-    // 布局快照（录制开始前在主线程写入，录制期间仅在 recordingQueue 读取，不会并发写入，线程安全）
-    private var recOutputSize: CGSize = CGSize(width: 1080, height: 1920)
-    private var recSplitMode: SplitMode = .leftRight
-    private var recSplitRatio: CGFloat = 0.5
-    private var recPanelsSwapped: Bool = false
-    private var recPipShape: PipShape = .roundedRect
-    private var recPipScale: CGFloat = 0.3
-    private var recPipOffset: CGSize = .zero
-    private var recBorderStyle: BorderStyleConfig = .default
+    private let recorder = VideoRecordingSession()
+    private let recordingComposer = CameraRecordingComposer()
+    private let pendingVideoStore: PendingVideoStore
+    private let albumSaver: VideoAlbumSaver
+    private var recordingID: UUID?
+    private var recordingGeneration = UUID()
+    private var recordingTimer: Timer?
+    private var saveBackgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private var pendingVideoURLs: [URL] = []
+    @Published private(set) var pendingVideoCount = 0
+    @Published private(set) var photoAccessDenied = false
+    var hasPendingVideoSaves: Bool { pendingVideoCount > 0 }
 
     // MARK: - Computed
 
-    init(settings: AppSettings? = nil) {
+    init(settings: AppSettings? = nil, pendingVideoStore: PendingVideoStore = PendingVideoStore(),
+         albumSaver: VideoAlbumSaver = VideoAlbumSaver()) {
         self.settings = settings ?? .shared
+        self.pendingVideoStore = pendingVideoStore
+        self.albumSaver = albumSaver
+        pendingVideoURLs = pendingVideoStore.pendingURLs()
+        pendingVideoCount = pendingVideoURLs.count
     }
 
     /// One persisted preference, shared by both pickers. Layout restoration must
@@ -153,16 +117,9 @@ final class CameraViewModel: ObservableObject {
 
     func setup(mode: CaptureMode) {
         captureMode = mode
+        cancellables.removeAll()
         restoreLayout(from: settings)
         observeLayoutPersistence(using: settings)
-
-        cameraEngine.$isRecording
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$isRecording)
-
-        cameraEngine.$recordingDuration
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$recordingDuration)
 
         cameraEngine.$error
             .compactMap { $0 }
@@ -202,37 +159,7 @@ final class CameraViewModel: ObservableObject {
             }
         }
 
-        // 录制用帧回调（在 dataOutputQueue 上，不跳主线程）
-        cameraEngine.onFrontFrameForRecording = { [weak self] buffer in
-            guard let self else { return }
-            self.setFrontBuffer(CMSampleBufferGetImageBuffer(buffer))
-        }
-
-        cameraEngine.onBackFrameForRecording = { [weak self] buffer in
-            guard let self else { return }
-            self.setBackBuffer(CMSampleBufferGetImageBuffer(buffer))
-
-            // 合拍模式 + 录制中：抓取导入视频帧（仅用于后台合成，预览显示缩略图）
-            if self.recIsDuetMode, self.composedWriter != nil,
-               let vo = self.importedVideoOutput {
-                let time = vo.itemTime(forHostTime: CACurrentMediaTime())
-                if let pb = vo.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) {
-                    // videoComposition 已应用 preferredTransform，无需额外旋转
-                    let ci = CIImage(cvPixelBuffer: pb, options: [
-                        .colorSpace: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-                    ])
-                    self.latestImportedCIImage = ci
-                }
-            }
-
-            // 以后摄帧为基准触发合成写入
-            self.composeAndWriteFrame(timestamp: CMSampleBufferGetPresentationTimeStamp(buffer))
-        }
-
-        cameraEngine.onAudioSample = { [weak self] buffer in
-            guard let self else { return }
-            self.writeAudioSample(buffer)
-        }
+        configureRecordingCallbacks()
 
         // 布局变化同步到录制快照
         layoutEngine.objectWillChange
@@ -251,6 +178,9 @@ final class CameraViewModel: ObservableObject {
             .store(in: &cancellables)
 
         Task {
+            // Recover prior completed files before cameras become recordable.
+            await pendingVideoStore.recoverFinishedRecordings()
+            refreshPendingVideoSaves()
             let granted = await cameraEngine.checkPermissions()
             guard granted else {
                 permissionDenied = true
@@ -260,6 +190,26 @@ final class CameraViewModel: ObservableObject {
             cameraEngine.setupSession(resolution: resolution)
             cameraEngine.setFrontMirrored(isFrontMirrored)
         }
+    }
+
+    /// Separate from camera permission/session setup so deterministic sample fixtures
+    /// can exercise the production pipeline without accessing camera hardware.
+    func configureRecordingCallbacks() {
+    // Capture callbacks never read main-actor state or own writer inputs.
+    let composer = recordingComposer
+    let recorder = recorder
+    cameraEngine.onFrontFrameForRecording = { buffer in
+        composer.updateFront(CMSampleBufferGetImageBuffer(buffer))
+    }
+    cameraEngine.onBackFrameForRecording = { buffer in
+        composer.updateBack(CMSampleBufferGetImageBuffer(buffer))
+        recorder.appendVideo(at: CMSampleBufferGetPresentationTimeStamp(buffer)) { size in
+            composer.compose(in: size)
+        }
+    }
+    cameraEngine.onAudioSample = { buffer in
+        recorder.appendAudio(buffer)
+    }
     }
 
     // MARK: - Layout Persistence
@@ -386,6 +336,7 @@ final class CameraViewModel: ObservableObject {
     }
 
     func cleanup() {
+        if isRecording { stopRecording() }
         cameraEngine.stopSession()
         mediaImporter.cleanup()
     }
@@ -414,20 +365,21 @@ final class CameraViewModel: ObservableObject {
         }
     }
 
-    /// 同步布局参数到录制线程可访问的快照
+    /// The writer owns output size; only layout/source values change while recording.
     func syncRecordingSnapshot() {
-        // 录制中：outputSize 不可变（AVAssetWriter 已固定），其余布局参数实时同步
-        if !isRecording {
-            recOutputSize = currentVideoExportSize
-        }
-        recSplitMode = splitMode
-        recSplitRatio = layoutEngine.splitRatio
-        recPanelsSwapped = panelsSwapped
-        recPipShape = layoutEngine.pipShape
-        recPipScale = layoutEngine.pipScale
-        recPipOffset = layoutEngine.pipOffset
-        recBorderStyle = layoutEngine.borderStyle
-        recIsDuetMode = mediaImporter.isInDuetMode
+        recordingComposer.update(.init(
+            generation: recordingGeneration,
+            splitMode: splitMode,
+            splitRatio: layoutEngine.splitRatio,
+            panelsSwapped: panelsSwapped,
+            pipShape: layoutEngine.pipShape,
+            pipScale: layoutEngine.pipScale,
+            pipOffset: layoutEngine.pipOffset,
+            borderWidth: layoutEngine.borderStyle.style == .none ? 0 : layoutEngine.borderStyle.width,
+            isDuet: mediaImporter.isInDuetMode,
+            importedImage: importedCIImage,
+            importedVideoOutput: importedVideoOutput
+        ))
     }
 
     func openSystemPhotos() {
@@ -472,6 +424,7 @@ final class CameraViewModel: ObservableObject {
     // MARK: - Recording / Photo Actions
 
     func triggerCapture() {
+        guard !isProcessing else { return }
         switch shootingMode {
         case .photo:
             // 拍照不中断录制，可以在录制过程中同时拍照
@@ -692,354 +645,169 @@ final class CameraViewModel: ObservableObject {
         }
     }
 
-    private func saveVideoToAlbum(_ url: URL) {
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-            guard status == .authorized else { return }
-            PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
-            } completionHandler: { success, _ in
-                DispatchQueue.main.async {
-                    if success {
-                        ReviewPromptManager.shared.recordSuccessfulCreation()
-                        ReviewPromptManager.shared.queueAfterSuccessfulCreation()
-                    }
-                    self.isProcessing = false
+    private func refreshPendingVideoSaves() {
+        pendingVideoURLs = Array(Set(pendingVideoURLs.filter { FileManager.default.fileExists(atPath: $0.path) }
+                                    + pendingVideoStore.pendingURLs()))
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        pendingVideoCount = pendingVideoURLs.count
+    }
+
+    func retryPendingVideoSaves() {
+        guard !isRecording, !isProcessing, hasPendingVideoSaves else { return }
+        isProcessing = true
+        photoAccessDenied = false
+        beginSaveBackgroundTask()
+        let urls = pendingVideoURLs
+        Task { await savePendingVideos(urls) }
+    }
+
+    private func savePendingVideos(_ urls: [URL]) async {
+        defer {
+            isProcessing = false
+            endSaveBackgroundTask()
+        }
+        for url in urls {
+            do {
+                // Keep the source alive through thumbnail generation and the Photos transaction.
+                let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+                generator.appliesPreferredTrackTransform = true
+                generator.maximumSize = CGSize(width: 200, height: 200)
+                let thumbnail = try? await generator.image(at: .zero).image
+                try await albumSaver.save(url)
+                if let thumbnail { lastSavedThumbnail = UIImage(cgImage: thumbnail) }
+                pendingVideoStore.markSaved(url)
+                pendingVideoURLs.removeAll { $0 == url }
+                pendingVideoCount = pendingVideoURLs.count
+                ReviewPromptManager.shared.recordSuccessfulCreation()
+                ReviewPromptManager.shared.queueAfterSuccessfulCreation()
+            } catch {
+                photoAccessDenied = false
+                switch error {
+                case VideoAlbumSaveError.permissionDenied:
+                    photoAccessDenied = true
+                    errorMessage = "error.videoPhotosPermission".localized
+                case VideoAlbumSaveError.permissionRestricted:
+                    errorMessage = "error.videoPhotosRestricted".localized
+                case VideoAlbumSaveError.missingFile:
+                    pendingVideoURLs.removeAll { $0 == url }
+                    pendingVideoCount = pendingVideoURLs.count
+                    errorMessage = "error.videoFileMissing".localized
+                default:
+                    errorMessage = "error.videoAlbumSave".localized
                 }
+                showError = true
+                return
             }
         }
     }
 
-    // MARK: - Video Recording (Real-time Composition)
-
-    func toggleRecording() {
-        if isRecording {
-            stopRecording()
-        } else {
-            startRecording()
+    private func beginSaveBackgroundTask() {
+        guard saveBackgroundTask == .invalid else { return }
+        saveBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "FinishAndSaveVideo") { [weak self] in
+            Task { @MainActor in
+                VideoSaveDiagnostics.record("background-time-expired")
+                self?.endSaveBackgroundTask()
+            }
         }
     }
 
+    private func endSaveBackgroundTask() {
+        guard saveBackgroundTask != .invalid else { return }
+        let task = saveBackgroundTask
+        saveBackgroundTask = .invalid
+        UIApplication.shared.endBackgroundTask(task)
+    }
+
+    // MARK: - Video Recording
+
+    func toggleRecording() {
+        guard !isProcessing else { return }
+        if isRecording { stopRecording() }
+        else { startRecording() }
+    }
+
     private func startRecording() {
+        guard !isProcessing, !isRecording, camerasReady else { return }
+        isProcessing = true
+        photoAccessDenied = false
+        recordingGeneration = UUID()
         syncRecordingSnapshot()
-        let outputSize = currentVideoExportSize
-        let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("splitcam_composed_\(UUID().uuidString).mp4")
-        composedOutputURL = outputURL
-
         do {
-            let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
-
-            let videoSettings = resolutionQuality.videoOutputSettings(for: aspectRatio.exportSize)
-
-            let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
-            videoInput.expectsMediaDataInRealTime = true
-
-            let sourcePixelAttrs: [String: Any] = [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-                kCVPixelBufferWidthKey as String: Int(outputSize.width),
-                kCVPixelBufferHeightKey as String: Int(outputSize.height)
-            ]
-            let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-                assetWriterInput: videoInput,
-                sourcePixelBufferAttributes: sourcePixelAttrs
-            )
-
-            let audioSettings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 44100,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderBitRateKey: 128000
-            ]
-            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
-            audioInput.expectsMediaDataInRealTime = true
-
-            writer.add(videoInput)
-            writer.add(audioInput)
-            writer.startWriting()
-
-            composedWriter = writer
-            composedVideoInput = videoInput
-            composedAudioInput = audioInput
-            pixelBufferAdaptor = adaptor
-            recordingStartTime = nil
-            isWritingStarted = false
+            let url = try pendingVideoStore.makeRecordingURL()
+            recordingID = try recorder.start(url: url, fullSize: aspectRatio.exportSize, quality: resolutionQuality) { [weak self] id in
+                DispatchQueue.main.async {
+                    guard let self, self.recordingID == id, self.isRecording else { return }
+                    self.stopRecording()
+                }
+            }
         } catch {
-            errorMessage = "error.recordingInit".localized + ": \(error.localizedDescription)"
+            VideoSaveDiagnostics.record("recording-setup", error: error)
+            isProcessing = false
+            errorMessage = "error.recordingInit".localized
             showError = true
             return
         }
 
         isRecording = true
+        isProcessing = false
         recordingDuration = 0
-
-        // 录制计时器
-        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
-            Task { @MainActor [weak self] in
-                guard let self else { timer.invalidate(); return }
-                if !self.isRecording {
-                    timer.invalidate()
-                    return
-                }
-                self.recordingDuration += 1
+        recordingTimer?.invalidate()
+        let startedAt = Date()
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+            Task { @MainActor in
+                guard let self, self.isRecording else { timer.invalidate(); return }
+                self.recordingDuration = Date().timeIntervalSince(startedAt)
             }
         }
-
-        if isDuetMode && importedPlayer != nil {
-            mediaImporter.startPlayback()
-        }
-    }
-
-    /// 实时合成一帧并写入（在 dataOutputQueue 上调用）
-    private func composeAndWriteFrame(timestamp: CMTime) {
-        guard let writer = composedWriter,
-              writer.status == .writing,
-              let videoInput = composedVideoInput,
-              let adaptor = pixelBufferAdaptor,
-              let frontPB = _latestFrontPixelBuffer else { return }
-
-        let backPB = _latestBackPixelBuffer
-        if !recIsDuetMode && backPB == nil { return }
-
-        // 首帧启动 session
-        if !isWritingStarted {
-            writer.startSession(atSourceTime: timestamp)
-            recordingStartTime = timestamp
-            isWritingStarted = true
-        }
-
-        guard videoInput.isReadyForMoreMediaData else { return }
-
-        // 从快照读取当前布局参数（录制开始前在主线程写入）
-        let currentOutputSize = recOutputSize
-        let currentSplitMode = recSplitMode
-        let currentSplitRatio = recSplitRatio
-        let currentPanelsSwapped = recPanelsSwapped
-        let currentPipShape = recPipShape
-        let currentPipScale = recPipScale
-        let currentPipOffset = recPipOffset
-        let currentBorderStyle = recBorderStyle
-
-        // 计算目标区域 — 用 SplitLayoutEngine 的静态方法保证预览与录制几何一致
-        let frames: (first: CGRect, second: CGRect)
-        if currentSplitMode == .pip {
-            let pipRect = SplitLayoutEngine.pipRect(
-                in: currentOutputSize,
-                scale: currentPipScale,
-                offset: currentPipOffset
-            )
-            frames = (CGRect(origin: .zero, size: currentOutputSize), pipRect)
-        } else {
-            let bw = currentBorderStyle.style != .none ? currentBorderStyle.width : 0
-            switch currentSplitMode {
-            case .leftRight:
-                let fw = currentOutputSize.width * currentSplitRatio - bw / 2
-                let sx = currentOutputSize.width * currentSplitRatio + bw / 2
-                let sw = currentOutputSize.width - sx
-                frames = (CGRect(x: 0, y: 0, width: fw, height: currentOutputSize.height),
-                          CGRect(x: sx, y: 0, width: sw, height: currentOutputSize.height))
-            case .topBottom:
-                let fh = currentOutputSize.height * currentSplitRatio - bw / 2
-                let sy = currentOutputSize.height * currentSplitRatio + bw / 2
-                let sh = currentOutputSize.height - sy
-                frames = (CGRect(x: 0, y: 0, width: currentOutputSize.width, height: fh),
-                          CGRect(x: 0, y: sy, width: currentOutputSize.width, height: sh))
-            case .pip:
-                frames = (CGRect(origin: .zero, size: currentOutputSize), .zero)
-            }
-        }
-
-        // 获取 CIImage（合拍模式用导入内容替代后摄）
-        let frontCI = CIImage(cvPixelBuffer: frontPB)
-        let backCI: CIImage
-        if recIsDuetMode {
-            if let ci = latestImportedCIImage {
-                backCI = ci
-            } else if let img = importedCIImage {
-                backCI = img
-            } else {
-                return
-            }
-        } else {
-            guard let bpb = backPB else { return }
-            backCI = CIImage(cvPixelBuffer: bpb)
-        }
-
-        let firstCI = currentPanelsSwapped ? frontCI : backCI
-        let secondCI = currentPanelsSwapped ? backCI : frontCI
-
-        var composite = CIImage(color: .black).cropped(to: CGRect(origin: .zero, size: currentOutputSize))
-        let h = currentOutputSize.height
-
-        composite = fitAndClip(firstCI, into: frames.first, outputHeight: h).composited(over: composite)
-
-        let fittedSecond = fitAndClip(secondCI, into: frames.second, outputHeight: h)
-        if currentSplitMode == .pip {
-            let masked = applyPipMaskForRecording(fittedSecond, rect: frames.second, shape: currentPipShape, outputHeight: h)
-            composite = masked.composited(over: composite)
-        } else {
-            composite = fittedSecond.composited(over: composite)
-        }
-
-        // 轻量锐化（CISharpenLuminance 性能极高，不影响帧率）
-        if let sharpen = CIFilter(name: "CISharpenLuminance") {
-            sharpen.setValue(composite, forKey: kCIInputImageKey)
-            sharpen.setValue(0.4, forKey: kCIInputSharpnessKey)
-            if let sharpened = sharpen.outputImage {
-                composite = sharpened
-            }
-        }
-
-        // 渲染到 pixel buffer
-        guard let pool = adaptor.pixelBufferPool else { return }
-        var outputBuffer: CVPixelBuffer?
-        CVPixelBufferPoolCreatePixelBuffer(nil, pool, &outputBuffer)
-        guard let buffer = outputBuffer else { return }
-
-        recordingCIContext.render(composite, to: buffer)
-        adaptor.append(buffer, withPresentationTime: timestamp)
-    }
-
-    private func writeAudioSample(_ buffer: CMSampleBuffer) {
-        guard let writer = composedWriter,
-              writer.status == .writing,
-              isWritingStarted,
-              let audioInput = composedAudioInput,
-              audioInput.isReadyForMoreMediaData else { return }
-        audioInput.append(buffer)
-    }
-
-    /// 从 CVPixelBuffer 创建 CMSampleBuffer（用于预览显示）
-    private func createSampleBufferFromPixelBuffer(_ pixelBuffer: CVPixelBuffer, timestamp: CMTime) -> CMSampleBuffer? {
-        var formatDesc: CMVideoFormatDescription?
-        CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: pixelBuffer, formatDescriptionOut: &formatDesc)
-        guard let format = formatDesc else { return nil }
-
-        var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: timestamp, decodeTimeStamp: .invalid)
-        var sampleBuffer: CMSampleBuffer?
-        CMSampleBufferCreateReadyWithImageBuffer(allocator: nil, imageBuffer: pixelBuffer, formatDescription: format, sampleTiming: &timing, sampleBufferOut: &sampleBuffer)
-        return sampleBuffer
-    }
-
-    /// CIImage aspect fill + clip（与 VideoComposer 中相同逻辑）
-    private func fitAndClip(_ image: CIImage, into targetRect: CGRect, outputHeight: CGFloat) -> CIImage {
-        let imageSize = image.extent.size
-        guard targetRect.width > 0, targetRect.height > 0 else {
-            return CIImage(color: .clear).cropped(to: .zero)
-        }
-
-        let scaleX = targetRect.width / imageSize.width
-        let scaleY = targetRect.height / imageSize.height
-        let scale = max(scaleX, scaleY)
-
-        let scaledW = imageSize.width * scale
-        let scaledH = imageSize.height * scale
-
-        let ciY = outputHeight - targetRect.origin.y - targetRect.height
-        let ciRect = CGRect(x: targetRect.origin.x, y: ciY, width: targetRect.width, height: targetRect.height)
-
-        let offsetX = ciRect.origin.x + (ciRect.width - scaledW) / 2
-        let offsetY = ciRect.origin.y + (ciRect.height - scaledH) / 2
-
-        return image
-            .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-            .transformed(by: CGAffineTransform(translationX: offsetX, y: offsetY))
-            .cropped(to: ciRect)
-    }
-
-    /// PiP 遮罩（录制用，线程安全）
-    private func applyPipMaskForRecording(_ image: CIImage, rect: CGRect, shape: PipShape, outputHeight: CGFloat) -> CIImage {
-        let ciY = outputHeight - rect.origin.y - rect.height
-        let ciRect = CGRect(x: rect.origin.x, y: ciY, width: rect.width, height: rect.height)
-
-        let mw = Int(rect.width), mh = Int(rect.height)
-        guard mw > 0, mh > 0 else { return image }
-
-        guard let ctx = CGContext(data: nil, width: mw, height: mh, bitsPerComponent: 8,
-                                   bytesPerRow: mw * 4, space: CGColorSpaceCreateDeviceGray(),
-                                   bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return image }
-        ctx.setFillColor(gray: 0, alpha: 1)
-        ctx.fill(CGRect(x: 0, y: 0, width: mw, height: mh))
-        ctx.setFillColor(gray: 1, alpha: 1)
-
-        if shape == .circle {
-            let s = min(CGFloat(mw), CGFloat(mh))
-            ctx.fillEllipse(in: CGRect(x: (CGFloat(mw)-s)/2, y: (CGFloat(mh)-s)/2, width: s, height: s))
-        } else {
-            let path = CGPath(roundedRect: CGRect(x: 0, y: 0, width: mw, height: mh),
-                              cornerWidth: 12, cornerHeight: 12, transform: nil)
-            ctx.addPath(path)
-            ctx.fillPath()
-        }
-
-        guard let maskCG = ctx.makeImage() else { return image }
-        let maskCI = CIImage(cgImage: maskCG)
-            .transformed(by: CGAffineTransform(translationX: ciRect.origin.x, y: ciRect.origin.y))
-
-        guard let blend = CIFilter(name: "CIBlendWithMask") else { return image }
-        blend.setValue(image, forKey: kCIInputImageKey)
-        blend.setValue(CIImage(color: .clear).cropped(to: image.extent), forKey: kCIInputBackgroundImageKey)
-        blend.setValue(maskCI, forKey: kCIInputMaskImageKey)
-        return blend.outputImage ?? image
+        if isDuetMode && importedPlayer != nil { mediaImporter.startPlayback() }
     }
 
     private func stopRecording() {
-        guard isRecording else { return }
+        guard isRecording, let id = recordingID else { return }
+        // Lock the UI before the asynchronous writer finalization begins.
+        isProcessing = true
         isRecording = false
+        recordingTimer?.invalidate()
+        recordingTimer = nil
         importedVideoBuffer = nil
-        latestImportedCIImage = nil
+        if isDuetMode { mediaImporter.pausePlayback() }
+        beginSaveBackgroundTask()
 
-        if isDuetMode {
-            mediaImporter.pausePlayback()
+        recorder.finish(id: id) { [self] result in
+            // Keep the owner alive until the finalized file reaches durable storage.
+            Task { @MainActor in await self.handleFinishedRecording(result, id: id) }
         }
+    }
 
-        // 完成写入并保存
-        composedVideoInput?.markAsFinished()
-        composedAudioInput?.markAsFinished()
-
-        guard let writer = composedWriter, let outputURL = composedOutputURL else { return }
-        let writerRef = writer
-
-        // 如果从未推入过任何帧（startSession 未调用），finishWriting 会变成 .failed，
-        // 触发"保存失败"误报。直接取消并静默丢弃。
-        if !isWritingStarted {
-            writerRef.cancelWriting()
-            composedWriter = nil
-            composedVideoInput = nil
-            composedAudioInput = nil
-            pixelBufferAdaptor = nil
-            recordingStartTime = nil
-            return
-        }
-
-        writerRef.finishWriting { [weak self] in
-            // 注意：AVAssetWriter 不是 Sendable；不要把 writerRef 捕获进 @Sendable 闭包。
-            // 等跨到主线程后再通过 self.composedWriter 读状态（同一对象，线程安全）。
-            guard let self else { return }
-            DispatchQueue.main.async {
-                let didComplete = self.composedWriter?.status == .completed
-                if didComplete {
-                    // 生成缩略图
-                    Task {
-                        let asset = AVURLAsset(url: outputURL)
-                        let generator = AVAssetImageGenerator(asset: asset)
-                        generator.appliesPreferredTrackTransform = true
-                        generator.maximumSize = CGSize(width: 200, height: 200)
-                        if let cgImage = try? await generator.image(at: .zero).image {
-                            self.lastSavedThumbnail = UIImage(cgImage: cgImage)
-                        }
-                    }
-                    self.saveVideoToAlbum(outputURL)
-                } else {
-                    self.errorMessage = "error.videoSaveFailed".localized
-                    self.showError = true
-                }
-                self.composedWriter = nil
-                self.composedVideoInput = nil
-                self.composedAudioInput = nil
-                self.pixelBufferAdaptor = nil
-                self.isWritingStarted = false
-                self.recordingStartTime = nil
+    private func handleFinishedRecording(_ result: Result<URL, VideoRecordingSession.Failure>, id: UUID) async {
+        guard recordingID == id else { return }
+        recordingID = nil
+        switch result {
+        case .success(let outputURL):
+            do {
+                let ready = try pendingVideoStore.markReady(outputURL)
+                pendingVideoURLs.append(ready)
+                refreshPendingVideoSaves()
+                await savePendingVideos([ready])
+            } catch {
+                // A failed rename must not discard the successfully encoded video.
+                VideoSaveDiagnostics.record("video-ready-storage", error: error)
+                pendingVideoURLs.append(outputURL)
+                pendingVideoCount = pendingVideoURLs.count
+                isProcessing = false
+                endSaveBackgroundTask()
+                errorMessage = "error.videoAlbumSave".localized
+                showError = true
             }
+        case .failure(let error):
+            isProcessing = false
+            endSaveBackgroundTask()
+            if case .noVideoFrames = error {
+                errorMessage = "error.videoNoFrames".localized
+            } else {
+                errorMessage = "error.videoEncoding".localized
+            }
+            showError = true
         }
     }
 
@@ -1129,9 +897,7 @@ final class CameraViewModel: ObservableObject {
         importedVideoBuffer = nil
         importedVideoOutput = nil
         importedCIImage = nil
-        latestImportedCIImage = nil
         importedVideoOrientation = .up
-        recIsDuetMode = false
         syncRecordingSnapshot()
     }
 

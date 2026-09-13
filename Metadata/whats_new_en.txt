@@ -5,5 +5,6 @@ SplitCam 1.8:
 - Four new Pro app icons: Chrome, Terrazzo, Blueprint, and Bloom.
 - A redesigned SplitCam Pro page with an animated dual-lens header and clearer plan and billing details.
 - A simpler Settings page. Find Restore Purchases at the bottom of the Pro page.
+- Improved video saving, with clearer error messages and a retry option for videos that could not be added to Photos.
 
 Thanks for helping us make SplitCam better!
