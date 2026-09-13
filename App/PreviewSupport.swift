@@ -20,7 +20,6 @@ enum ScreenshotSupport {
         model.splitMode = screen == "pip" ? .pip : (screen == "split" || screen == "duet" ? .leftRight : .topBottom)
         model.layoutEngine.pipScale = 0.42
         model.layoutEngine.pipOffset = CGSize(width: -0.04, height: 0.46)
-        model.resolutionQuality = AppSettings.shared.defaultVideoQuality
         model.backFrameBuffer = buffer(named: "demo-back.png")
         model.frontFrameBuffer = buffer(named: "demo-front.png")
         UserDefaults.standard.set(true, forKey: "settings.hasShownPipScaleHint")

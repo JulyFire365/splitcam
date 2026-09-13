@@ -21,7 +21,6 @@ final class CameraViewModel: ObservableObject {
     @Published var shootingMode: ShootingMode = .photo
     @Published var aspectRatio: AspectRatioMode = .ratio3_4
     @Published var resolution: CaptureResolution = .hd1080p
-    @Published var resolutionQuality: ResolutionQuality = .standard
     @Published var zoomLevel: ZoomLevel = .wide
     @Published var showVideoPicker = false
     @Published var showError = false
@@ -47,6 +46,7 @@ final class CameraViewModel: ObservableObject {
     // MARK: - State
 
     private var captureMode: CaptureMode = .dualCamera
+    private let settings: AppSettings
     @Published var importedPlayer: AVPlayer?
     @Published var importedImage: UIImage?
     @Published var importedVideoBuffer: CMSampleBuffer?
@@ -126,6 +126,14 @@ final class CameraViewModel: ObservableObject {
 
     // MARK: - Computed
 
+    init(settings: AppSettings? = nil) {
+        self.settings = settings ?? .shared
+    }
+
+    /// One persisted preference, shared by both pickers. Layout restoration must
+    /// never replace it with a second, stale camera-local value.
+    var resolutionQuality: ResolutionQuality { settings.defaultVideoQuality }
+
     /// Photo output stays independent of the video quality preference.
     var currentExportSize: CGSize {
         aspectRatio.exportSize
@@ -143,9 +151,8 @@ final class CameraViewModel: ObservableObject {
 
     // MARK: - Setup
 
-    func setup(mode: CaptureMode, settings: AppSettings) {
+    func setup(mode: CaptureMode) {
         captureMode = mode
-        resolutionQuality = settings.defaultVideoQuality
         restoreLayout(from: settings)
         observeLayoutPersistence(using: settings)
 

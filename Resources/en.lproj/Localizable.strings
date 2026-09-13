@@ -26,7 +26,7 @@
 "settings.aspectRatio" = "Default Frame";
 "settings.frontMirror" = "Mirror Front Camera";
 "settings.rememberLayout" = "Remember Last Capture Layout & Settings";
-"settings.videoQuality" = "Default Video Quality";
+"settings.videoQuality" = "Video Quality";
 "settings.rate" = "Rate SplitCam";
 "settings.contact" = "Contact";
 "settings.subscription.active" = "Subscribed";
@@ -59,7 +59,8 @@
 "quality.standard.detail" = "A balance of detail and file size";
 "quality.high.detail" = "More detail for your best moments";
 "quality.estimate" = "About %@ MB per minute";
-"quality.footer" = "Estimates include audio. Actual size varies with the scene and recording length. Video quality does not change photo resolution.";
+"quality.scope" = "For video recordings only. Photo quality stays the same.";
+"quality.footer" = "Your choice is shared with the camera and remembered for future videos, even when Remember Last Layout is off. Size estimates include audio and vary with the scene and recording length.";
 "paywall.headline" = "Two views.\nOne great story.";
 "paywall.close" = "Close";
 "paywall.benefit.pipMode" = "Keep yourself in the video with PiP";

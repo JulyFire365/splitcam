@@ -60,3 +60,16 @@ The revised first five scenes use different outfits, expressions and settings. `
 Run `swift Tools/ValidateASO.swift` to verify dimensions, opacity, color space and absence of page counters, including OCR near the former page-counter position.
 
 Final revision checks passed on 2026-09-13: all 16 upload PNGs are 1284 × 2778 opaque sRGB, no page counters were detected, and all 10 camera captures contain the expected nonblank demo content. Both language overviews were visually inspected. A clipped pet portrait was reframed as a landscape source and recaptured; screenshots taken before the app finished launching were replaced. The capture script now checks demo-frame readiness and retries instead of trusting a fixed startup delay. OCR validation needs access to macOS Vision services. These checks do not claim an ASC upload was performed.
+
+## Video quality follow-up (2026-09-13)
+
+- Video quality is now shown only in Video mode, using one shared picker and one persisted preference. See the [state contract and save investigation](video-quality-and-save-audit.md).
+- Verified through native simulator interaction: tapping the far-right blank area of Space Saver selects it and dismisses the camera picker; Settings immediately shows Space Saver. Tapping the far-left inset of High in Settings selects High. Returning to Video shows High without restart.
+- Verified Photo mode hides the quality entry. Video mode restores it without changing the selected quality.
+- Turned Remember Last Capture Layout & Settings off, chose High, terminated/relaunched without quality overrides, and confirmed High remained on the camera. The test app's persisted plist contained `settings.defaultVideoQuality = high` and `settings.remembersLastLayout = false`.
+- Checked Simplified Chinese at the largest accessibility text size: rows expand, text wraps, and native list scrolling reaches the selected High option and complete footer.
+- Debug Simulator and Release iPhone builds pass; Release Info.plist remains 1.8 (9). Existing VideoComposer Swift 6 migration warnings remain unchanged. Localizations and release metadata validate.
+- Re-ran the real HEVC harness: all four size mappings pass; Low / Standard / High encode and decode successfully with the same file-size results recorded above. This does not test the real camera's concurrent stop/finalize path.
+- Recaptured the four affected bilingual Settings / Quality raw screenshots; the quality board crop includes the new scope explanation and footer.
+
+The reported first-save failure remains under investigation. No fix to the recording finalization / Photos save pipeline is claimed in this revision.

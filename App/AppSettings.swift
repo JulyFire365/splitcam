@@ -138,6 +138,8 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(lastFrontCameraMirrored, forKey: Key.lastFrontCameraMirrored) }
     }
 
+    // Shared by Settings and Camera, independent of remembersLastLayout.
+    // Keep the historical storage key so existing choices survive upgrades.
     @Published var defaultVideoQuality: ResolutionQuality {
         didSet { defaults.set(defaultVideoQuality.rawValue, forKey: Key.defaultVideoQuality) }
     }

@@ -26,7 +26,7 @@
 "settings.aspectRatio" = "默认画幅";
 "settings.frontMirror" = "镜像前置摄像头";
 "settings.rememberLayout" = "记住上次拍摄布局与设置";
-"settings.videoQuality" = "默认视频画质";
+"settings.videoQuality" = "视频画质";
 "settings.rate" = "给 SplitCam 评分";
 "settings.contact" = "联系开发者";
 "settings.subscription.active" = "已订阅";
@@ -59,7 +59,8 @@
 "quality.standard.detail" = "兼顾画面细节与文件大小";
 "quality.high.detail" = "为精彩时刻保留更多细节";
 "quality.estimate" = "每分钟约 %@ MB";
-"quality.footer" = "估算包含音频，实际大小因画面内容与录制时长而异。视频画质不会改变照片分辨率。";
+"quality.scope" = "仅影响录制的视频，不改变照片画质。";
+"quality.footer" = "与相机页共用同一选择，并保留用于之后的视频，不受“记住上次布局”开关影响。大小估算包含音频，实际因画面内容与录制时长而异。";
 "paywall.headline" = "双重视角，\n让故事更完整。";
 "paywall.close" = "关闭";
 "paywall.benefit.pipMode" = "画中画视频，让你也在镜头里";

@@ -105,8 +105,10 @@ for (languageIndex, language) in ["en", "zh-Hans"].enumerated() {
 
             if index == 5 || index == 6 {
                 let source = base.appendingPathComponent("raw/\(language)/\(slide.screen).png")
-                let crop = index == 5 ? CGRect(x: 0, y: 170, width: 1320, height: 1370) : CGRect(x: 0, y: 1100, width: 1320, height: languageIndex == 1 ? 800 : 860)
-                let rect = CGRect(x: 72, y: index == 5 ? 870 : 990, width: 1176, height: crop.height * 1176 / 1320)
+                // Include the new video-only explanation and preference footer.
+                let crop = index == 5 ? CGRect(x: 0, y: 170, width: 1320, height: 1630) : CGRect(x: 0, y: 1100, width: 1320, height: languageIndex == 1 ? 800 : 860)
+                let detailWidth: CGFloat = index == 5 ? 1080 : 1176
+                let rect = CGRect(x: index == 5 ? 120 : 72, y: index == 5 ? 800 : 990, width: detailWidth, height: crop.height * detailWidth / 1320)
                 drawDetail(source, crop: crop, at: rect)
                 if index == 5 {
                     text(languageIndex == 0 ? "Three quality options.\nYour call." : "三档画质，\n按需选择。", x: 86, y: 2240, width: 1160, size: 68, color: foreground, weight: .semibold)

@@ -48,6 +48,7 @@ struct SettingsView: View {
                     } label: {
                         LabeledContent("settings.videoQuality".localized, value: settings.defaultVideoQuality.displayName)
                     }
+                    .accessibilityIdentifier("settings.videoQuality")
                 }
 
                 Section("settings.section.support".localized) {
@@ -223,12 +224,20 @@ struct VideoQualityPickerView: View {
     var body: some View {
         List {
             Section {
+                Text("quality.scope".localized)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            }
+            Section {
                 ForEach(ResolutionQuality.allCases, id: \.self) { quality in
                     Button {
                         settings.defaultVideoQuality = quality
                         dismiss()
                     } label: {
-                        HStack {
+                        HStack(spacing: 16) {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(quality.displayName)
                                     .font(.body.weight(.medium))
@@ -239,15 +248,32 @@ struct VideoQualityPickerView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            if quality == settings.defaultVideoQuality {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.yellow)
-                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.yellow)
+                                .opacity(quality == settings.defaultVideoQuality ? 1 : 0)
+                                .accessibilityHidden(true)
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
                         .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .foregroundStyle(.white)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .overlay(alignment: .bottom) {
+                        if quality != ResolutionQuality.allCases.last {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.22))
+                                .frame(height: 1)
+                                .padding(.horizontal, 16)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .accessibilityIdentifier("videoQuality.\(quality.rawValue)")
+                    .accessibilityAddTraits(quality == settings.defaultVideoQuality ? .isSelected : [])
                 }
             } footer: {
                 Text("quality.footer".localized)

@@ -12,6 +12,7 @@ struct CameraView: View {
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     @State private var showPaywall = false
     @State private var showSettings = false
+    @State private var showVideoQuality = false
     @State private var paywallTrigger: ProFeature?
     @State private var focusPoint: CGPoint?
     @State private var showFocusIndicator = false
@@ -69,7 +70,7 @@ struct CameraView: View {
                 return
             }
             #endif
-            viewModel.setup(mode: mode, settings: appSettings)
+            viewModel.setup(mode: mode)
         }
         .onDisappear {
             viewModel.persistLayoutIfNeeded(to: appSettings)
@@ -99,14 +100,21 @@ struct CameraView: View {
             SettingsView(settings: appSettings)
                 .presentationDetents([.large])
         }
+        .sheet(isPresented: $showVideoQuality) {
+            NavigationStack {
+                VideoQualityPickerView(settings: appSettings)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("settings.done".localized) { showVideoQuality = false }
+                        }
+                    }
+            }
+            .preferredColorScheme(.dark)
+            .presentationDetents([.large])
+        }
         .onChange(of: appSettings.defaultAspectRatio) { ratio in
             guard !viewModel.isRecording else { return }
             viewModel.setAspectRatio(ratio)
-        }
-        .onChange(of: appSettings.defaultVideoQuality) { quality in
-            guard !viewModel.isRecording else { return }
-            viewModel.resolutionQuality = quality
-            viewModel.syncRecordingSnapshot()
         }
         .onChange(of: appSettings.frontCameraMirrored) { mirrored in
             viewModel.setFrontMirrored(mirrored)
@@ -366,13 +374,13 @@ struct CameraView: View {
                 .opacity(viewModel.isRecording && viewModel.aspectRatio != ratio ? 0.3 : 1)
             }
 
-            // 分隔线
-            Rectangle()
-                .fill(.white.opacity(0.2))
-                .frame(width: 1, height: 16)
-
-            // 画质切换
-            resolutionToggle
+            // Video quality has no effect on photos; don't imply that it does.
+            if viewModel.shootingMode == .video {
+                Rectangle()
+                    .fill(.white.opacity(0.2))
+                    .frame(width: 1, height: 16)
+                resolutionToggle
+            }
 
             if canCollapseAspectControls {
                 Divider()
@@ -583,17 +591,9 @@ struct CameraView: View {
     // MARK: - Resolution Toggle (画质切换)
 
     private var resolutionToggle: some View {
-        Menu {
-            ForEach(ResolutionQuality.allCases, id: \.self) { quality in
-                Button {
-                    guard !viewModel.isRecording else { return }
-                    viewModel.resolutionQuality = quality
-                    appSettings.defaultVideoQuality = quality
-                    viewModel.syncRecordingSnapshot()
-                } label: {
-                    Label(quality.displayName, systemImage: viewModel.resolutionQuality == quality ? "checkmark" : quality.symbol)
-                }
-            }
+        Button {
+            guard !viewModel.isRecording else { return }
+            showVideoQuality = true
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: viewModel.resolutionQuality.symbol)
@@ -608,10 +608,12 @@ struct CameraView: View {
                 Capsule()
                     .fill(viewModel.resolutionQuality == .high ? .yellow.opacity(0.2) : .clear)
             )
+            .contentShape(Rectangle())
         }
         .disabled(viewModel.isRecording)
         .accessibilityLabel("settings.videoQuality".localized)
         .accessibilityValue(viewModel.resolutionQuality.displayName)
+        .accessibilityIdentifier("camera.videoQuality")
     }
 
     // MARK: - Duet Mode Badge (紧凑胶囊)
