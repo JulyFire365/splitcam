@@ -68,24 +68,16 @@ struct SettingsView: View {
                     } label: {
                         Label("settings.rate".localized, systemImage: "star.bubble")
                     }
-
-                    if !subscriptionManager.isPro {
-                        Button {
-                            Task { await subscriptionManager.restorePurchases() }
-                        } label: {
-                            Label("paywall.restore".localized, systemImage: "arrow.clockwise")
-                        }
-                    }
                 }
 
                 Section("settings.section.moreApps".localized) {
                     Link(destination: URL(string: "https://apps.apple.com/app/id6762594124")!) {
                         HStack(spacing: 12) {
-                            Image(systemName: "book.closed.fill")
-                                .font(.title3)
-                                .foregroundStyle(.mint)
-                                .frame(width: 32, height: 32)
-                                .background(.mint.opacity(0.16), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            Image("CustodyJournalIcon")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 40, height: 40)
+                                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Custody Journal")
@@ -224,7 +216,7 @@ private struct AspectRatioPickerView: View {
     }
 }
 
-private struct VideoQualityPickerView: View {
+struct VideoQualityPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var settings: AppSettings
 
@@ -237,7 +229,16 @@ private struct VideoQualityPickerView: View {
                         dismiss()
                     } label: {
                         HStack {
-                            Text(quality.displayName)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(quality.displayName)
+                                    .font(.body.weight(.medium))
+                                Text(quality.detail)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                Text("quality.estimate".localized("\(quality.estimatedMegabytesPerMinute)"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                             Spacer()
                             if quality == settings.defaultVideoQuality {
                                 Image(systemName: "checkmark")
@@ -248,6 +249,8 @@ private struct VideoQualityPickerView: View {
                     }
                     .foregroundStyle(.white)
                 }
+            } footer: {
+                Text("quality.footer".localized)
             }
         }
         .scrollContentBackground(.hidden)
@@ -257,7 +260,7 @@ private struct VideoQualityPickerView: View {
     }
 }
 
-private struct AppIconPickerView: View {
+struct AppIconPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var settings: AppSettings
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared

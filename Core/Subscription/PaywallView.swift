@@ -3,351 +3,333 @@ import StoreKit
 
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var manager = SubscriptionManager.shared
-
-    /// 触发付费墙的功能（可选，用于高亮显示）
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ObservedObject private var manager = SubscriptionManager.shared
     var triggeredBy: ProFeature?
-
-    @State private var selectedProduct: Product?
+    @State private var selectedProductID: String?
+    @State private var trialEligibility: [String: Bool] = [:]
     @State private var isPurchasing = false
+    @State private var isRestoring = false
     @State private var showSuccess = false
+    @State private var showRestoreResult = false
+
+    private let paper = Color(red: 0.97, green: 0.965, blue: 0.95)
+    private let ink = Color(red: 0.10, green: 0.10, blue: 0.15)
+    private let accent = Color(red: 0.37, green: 0.30, blue: 0.88)
+    private var selectedProduct: Product? { manager.products.first { $0.id == selectedProductID } }
+    private var busy: Bool { isPurchasing || isRestoring || manager.isLoading }
 
     var body: some View {
-        ZStack {
-            // 背景渐变
-            LinearGradient(
-                colors: [Color.black, Color(red: 0.1, green: 0.05, blue: 0.2)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
+        GeometryReader { geometry in
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 24) {
-                    // 关闭按钮
-                    closeButton
-
-                    // 标题
-                    headerSection
-
-                    // 功能列表
-                    featuresSection
-
-                    // 价格选择
-                    pricingSection
-
-                    // 购买按钮
-                    purchaseButton
-
-                    // 恢复购买 + 条款
-                    footerSection
+                VStack(spacing: 0) {
+                    ProHeroView()
+                        .frame(height: min(240, max(170, geometry.size.height * 0.28)))
+                        .clipShape(HeroCurve())
+                    VStack(spacing: 20) {
+                        header
+                        features
+                        pricing
+                        Text("paywall.terms".localized)
+                            .font(.caption2)
+                            .foregroundStyle(ink.opacity(0.55))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: 560)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, 20)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
+                .frame(maxWidth: .infinity)
+            }
+            .background(paper.ignoresSafeArea())
+            .ignoresSafeArea(.container, edges: .top)
+            .safeAreaInset(edge: .bottom, spacing: 0) { purchaseDock }
+            .overlay(alignment: .topTrailing) { closeButton }
+        }
+        .preferredColorScheme(.light)
+        .statusBarHidden(true)
+        .task { if manager.products.isEmpty { await manager.loadProducts() } }
+        .task(id: manager.products.map(\.id)) {
+            selectDefaultProduct()
+            for product in manager.products {
+                if let subscription = product.subscription {
+                    trialEligibility[product.id] = await subscription.isEligibleForIntroOffer
+                }
             }
         }
-        .task {
-            if manager.products.isEmpty {
-                await manager.loadProducts()
-            }
-            // 默认选中年订阅（性价比最高）
-            if selectedProduct == nil {
-                selectedProduct = manager.products.first { $0.id == ProProduct.yearly.rawValue }
-                    ?? manager.products.first
-            }
+        .onChange(of: manager.isPro) { isPro in
+            if isPro && !isPurchasing && !isRestoring { dismiss() }
         }
         .alert("purchase.success.title".localized, isPresented: $showSuccess) {
             Button("ok".localized) { dismiss() }
+        } message: { Text("purchase.success.message".localized) }
+        .alert("paywall.restore".localized, isPresented: $showRestoreResult) {
+            Button("ok".localized) { if manager.isPro { dismiss() } }
         } message: {
-            Text("purchase.success.message".localized)
+            Text(manager.isPro ? "purchase.restore.success".localized : "purchase.restore.empty".localized)
         }
+        .alert("error".localized, isPresented: Binding(
+            get: { manager.errorMessage != nil },
+            set: { if !$0 { manager.errorMessage = nil } }
+        )) {
+            Button("ok".localized) { manager.errorMessage = nil }
+        } message: { Text(manager.errorMessage ?? "") }
     }
-
-    // MARK: - Close Button
 
     private var closeButton: some View {
-        HStack {
-            Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.white.opacity(0.6))
-            }
+        Button { dismiss() } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 32, height: 32)
+                .background(.white.opacity(0.12), in: Circle())
+                .frame(width: 44, height: 44)
         }
-        .padding(.top, 8)
+        .accessibilityLabel("paywall.close".localized)
+        .padding(10)
     }
 
-    // MARK: - Header
-
-    private var headerSection: some View {
-        VStack(spacing: 12) {
-            // App Logo
-            Image("AppIconImage")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 88, height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: .purple.opacity(0.5), radius: 20)
-
-            Text("paywall.title".localized)
-                .font(.system(size: 32, weight: .bold))
-                .foregroundColor(.white)
-
+    private var header: some View {
+        VStack(spacing: 8) {
+            Text("paywall.headline".localized)
+                .font(.system(.largeTitle, design: .serif, weight: .semibold))
+                .tracking(-0.8)
+                .foregroundStyle(ink)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             Text("paywall.subtitle".localized)
                 .font(.subheadline)
-                .foregroundColor(.white.opacity(0.7))
-        }
-    }
-
-    // MARK: - Features
-
-    private var featuresSection: some View {
-        VStack(spacing: 0) {
-            ForEach(ProFeature.allCases, id: \.self) { feature in
-                featureRow(feature)
-                if feature != ProFeature.allCases.last {
-                    Divider()
-                        .background(Color.white.opacity(0.1))
-                }
-            }
-        }
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func featureRow(_ feature: ProFeature) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: feature.icon)
-                .font(.system(size: 18))
-                .foregroundColor(.orange)
-                .frame(width: 32)
-
-            Text(feature.displayName)
-                .font(.subheadline)
-                .foregroundColor(.white)
-
-            Spacer()
-
-            if feature == triggeredBy {
-                Text("paywall.new".localized)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.orange)
-                    .clipShape(Capsule())
-            } else {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.green)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-    }
-
-    // MARK: - Pricing
-
-    private var pricingSection: some View {
-        VStack(spacing: 10) {
-            if manager.products.isEmpty && manager.isLoading {
-                ProgressView()
-                    .tint(.white)
-                    .padding()
-            } else {
-                ForEach(manager.products, id: \.id) { product in
-                    pricingCard(product)
-                }
-            }
-        }
-    }
-
-    private func pricingCard(_ product: Product) -> some View {
-        let isSelected = selectedProduct?.id == product.id
-        let isYearly = product.id == ProProduct.yearly.rawValue
-        let isLifetime = product.id == ProProduct.lifetime.rawValue
-
-        return Button {
-            withAnimation(.spring(response: 0.3)) {
-                selectedProduct = product
-            }
-        } label: {
-            HStack(spacing: 14) {
-                // 选中指示器
-                ZStack {
-                    Circle()
-                        .stroke(isSelected ? Color.orange : Color.white.opacity(0.3), lineWidth: 2)
-                        .frame(width: 22, height: 22)
-                    if isSelected {
-                        Circle()
-                            .fill(Color.orange)
-                            .frame(width: 14, height: 14)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(planTitle(for: product))
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-
-                        if isYearly {
-                            Text("paywall.save61".localized)
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.orange)
-                                .clipShape(Capsule())
-                        }
-                    }
-
-                    if let trial = product.freeTrialDays, trial > 0 {
-                        Text("paywall.trialDays".localized("\(trial)"))
-                            .font(.system(size: 12))
-                            .foregroundColor(.orange.opacity(0.9))
-                    } else if isLifetime {
-                        Text("paywall.lifetimeDesc".localized)
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(product.displayPrice)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-
-                    if let period = product.periodDescription {
-                        Text("/ \(period)")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color.orange.opacity(0.15) : Color.white.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? Color.orange : Color.clear, lineWidth: 1.5)
-            )
-        }
-    }
-
-    private func planTitle(for product: Product) -> String {
-        switch product.id {
-        case ProProduct.monthly.rawValue:  return "plan.monthly".localized
-        case ProProduct.yearly.rawValue:   return "plan.yearly".localized
-        case ProProduct.lifetime.rawValue: return "plan.lifetime".localized
-        default: return product.displayName
-        }
-    }
-
-    // MARK: - Purchase Button
-
-    private var purchaseButton: some View {
-        Button {
-            guard let product = selectedProduct else { return }
-            Task {
-                isPurchasing = true
-                let success = await manager.purchase(product)
-                isPurchasing = false
-                if success { showSuccess = true }
-            }
-        } label: {
-            Group {
-                if isPurchasing || manager.isLoading {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Text(purchaseButtonText)
-                        .font(.system(size: 16, weight: .bold))
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                }
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 58)
-            .background(
-                LinearGradient(
-                    colors: [.orange, .pink],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .orange.opacity(0.4), radius: 10, y: 4)
-        }
-        .disabled(selectedProduct == nil || isPurchasing)
-    }
-
-    private var purchaseButtonText: String {
-        guard let product = selectedProduct else { return "paywall.selectPlan".localized }
-        if let trial = product.freeTrialDays, trial > 0 {
-            if product.id == ProProduct.yearly.rawValue {
-                return "paywall.startYearlyTrial".localized("\(trial)", product.displayPrice)
-            }
-            return "paywall.startTrial".localized("\(trial)")
-        }
-        if product.id == ProProduct.lifetime.rawValue {
-            return "paywall.buyNow".localized(product.displayPrice)
-        }
-        if product.id == ProProduct.yearly.rawValue {
-            return "paywall.subscribeYearly".localized(product.displayPrice)
-        }
-        return "paywall.subscribeNow".localized(product.displayPrice)
-    }
-
-    // MARK: - Footer
-
-    private var footerSection: some View {
-        VStack(spacing: 12) {
-            Button {
-                Task { await manager.restorePurchases() }
-            } label: {
-                Text("paywall.restore".localized)
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.5))
-            }
-
-            Text("paywall.terms".localized)
-                .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundStyle(ink.opacity(0.6))
                 .multilineTextAlignment(.center)
+        }
+    }
 
-            HStack(spacing: 16) {
-                if let url = URL(string: "https://splitcam-legal.vercel.app/terms-of-use.html") {
-                    Link("paywall.termsOfUse".localized, destination: url)
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.4))
-                }
-                if let url = URL(string: "https://splitcam-legal.vercel.app/privacy-policy.html") {
-                    Link("paywall.privacyPolicy".localized, destination: url)
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.4))
+    private var features: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(ProFeature.allCases, id: \.self) { feature in
+                HStack(spacing: 12) {
+                    Image(systemName: feature.icon)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(accent).frame(width: 26)
+                    Text("paywall.benefit.\(feature.rawValue)".localized)
+                        .font(.subheadline.weight(feature == triggeredBy ? .semibold : .regular))
+                        .foregroundStyle(ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold)).foregroundStyle(accent)
                 }
             }
         }
+    }
+
+    private var pricing: some View {
+        VStack(spacing: 12) {
+            if manager.products.isEmpty {
+                if manager.isLoading {
+                    ProgressView().tint(accent).frame(maxWidth: .infinity).padding(24)
+                } else {
+                    VStack(spacing: 10) {
+                        Text("paywall.unavailable".localized)
+                            .font(.subheadline).foregroundStyle(ink.opacity(0.6))
+                        Button("paywall.retry".localized) {
+                            Task { await manager.loadProducts() }
+                        }.foregroundStyle(accent)
+                    }.frame(maxWidth: .infinity).padding(16)
+                }
+            } else {
+                let subscriptions = [ProProduct.monthly, .yearly].compactMap { plan in
+                    manager.products.first { $0.id == plan.rawValue }
+                }
+                let layout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(spacing: 10))
+                    : AnyLayout(HStackLayout(alignment: .top, spacing: 10))
+                layout { ForEach(subscriptions) { product in planCard(product) } }
+                if let lifetime = manager.products.first(where: { $0.id == ProProduct.lifetime.rawValue }) {
+                    lifetimeCard(lifetime)
+                }
+            }
+        }.disabled(busy)
+    }
+
+    private func planCard(_ product: Product) -> some View {
+        let selected = selectedProductID == product.id
+        return Button { selectedProductID = product.id } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 4) {
+                    Text(planTitle(product)).font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 2)
+                    selectionMark(selected)
+                }
+                Text(product.displayPrice)
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .lineLimit(1).minimumScaleFactor(0.65)
+                Text(product.id == ProProduct.yearly.rawValue ? "paywall.billedYearly".localized : "paywall.billedMonthly".localized)
+                    .font(.caption).foregroundStyle(ink.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let savings = annualSavings, product.id == ProProduct.yearly.rawValue {
+                    Text("paywall.savings".localized("\(savings)"))
+                        .font(.caption2.weight(.bold)).foregroundStyle(accent)
+                } else {
+                    Text("paywall.flexible".localized)
+                        .font(.caption2).foregroundStyle(ink.opacity(0.6))
+                }
+            }
+            .foregroundStyle(ink)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+            .background(selected ? accent.opacity(0.07) : .white.opacity(0.6), in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(selected ? accent : ink.opacity(0.12), lineWidth: selected ? 2 : 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func lifetimeCard(_ product: Product) -> some View {
+        let selected = selectedProductID == product.id
+        return Button { selectedProductID = product.id } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    selectionMark(selected)
+                    Text("plan.lifetime".localized).font(.subheadline.weight(.semibold))
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Text("paywall.once".localized).font(.caption).foregroundStyle(ink.opacity(0.6))
+                        Spacer(minLength: 0)
+                        Text(product.displayPrice).font(.subheadline.weight(.bold))
+                    }
+                }
+                if dynamicTypeSize.isAccessibilitySize {
+                    Text(product.displayPrice).font(.title2.weight(.bold))
+                    Text("paywall.once".localized).font(.caption).foregroundStyle(ink.opacity(0.6))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(ink).padding(14)
+            .background(selected ? accent.opacity(0.07) : .white.opacity(0.6), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(selected ? accent : ink.opacity(0.12), lineWidth: selected ? 2 : 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func selectionMark(_ selected: Bool) -> some View {
+        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 19, weight: .medium))
+            .foregroundStyle(selected ? accent : ink.opacity(0.2)).accessibilityHidden(true)
+    }
+
+    private var purchaseDock: some View {
+        VStack(spacing: 10) {
+            Button {
+                guard let product = selectedProduct, !busy else { return }
+                Task {
+                    isPurchasing = true
+                    let success = await manager.purchase(product)
+                    isPurchasing = false
+                    if success { showSuccess = true }
+                }
+            } label: {
+                HStack {
+                    Spacer(minLength: 0)
+                    if busy { ProgressView().tint(.white) } else {
+                        Text(purchaseTitle).font(.headline).multilineTextAlignment(.center)
+                        Image(systemName: "arrow.right").font(.subheadline.weight(.semibold))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.white).frame(minHeight: 54).padding(.horizontal, 12)
+                .background(LinearGradient(colors: [accent, Color(red: 0.22, green: 0.45, blue: 0.93)], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 17))
+                .opacity(selectedProduct == nil ? 0.45 : 1)
+            }
+            .disabled(selectedProduct == nil || busy)
+            if let product = selectedProduct {
+                Text(billingSummary(product))
+                    .font(.caption).foregroundStyle(ink.opacity(0.65))
+                    .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 20) { legalLinks }
+                VStack(spacing: 8) { legalLinks }
+            }
+            .font(.caption).foregroundStyle(ink.opacity(0.65))
+        }
+        .frame(maxWidth: 560).padding(.horizontal, 24)
+        .padding(.top, 14).padding(.bottom, 8).frame(maxWidth: .infinity)
+        .background {
+            paper.ignoresSafeArea(.container, edges: .bottom)
+                .shadow(color: .black.opacity(0.05), radius: 12, y: -5)
+        }
+    }
+
+    @ViewBuilder private var legalLinks: some View {
+        Button("paywall.restore".localized) {
+            guard !busy else { return }
+            Task {
+                isRestoring = true
+                await manager.restorePurchases()
+                isRestoring = false
+                if manager.errorMessage == nil { showRestoreResult = true }
+            }
+        }.disabled(busy)
+        Link("paywall.termsOfUse".localized, destination: URL(string: "https://splitcam-legal.vercel.app/terms-of-use.html")!)
+        Link("paywall.privacyPolicy".localized, destination: URL(string: "https://splitcam-legal.vercel.app/privacy-policy.html")!)
+    }
+
+    private func selectDefaultProduct() {
+        guard selectedProduct == nil else { return }
+        selectedProductID = manager.products.first { $0.id == ProProduct.yearly.rawValue }?.id ?? manager.products.first?.id
+    }
+
+    private func eligibleTrialDays(_ product: Product) -> Int? {
+        guard trialEligibility[product.id] == true else { return nil }
+        return product.freeTrialDays
+    }
+
+    private var purchaseTitle: String {
+        guard let product = selectedProduct else { return "paywall.selectPlan".localized }
+        if let days = eligibleTrialDays(product) { return "paywall.startTrial".localized("\(days)") }
+        return "paywall.unlock".localized
+    }
+
+    private func billingSummary(_ product: Product) -> String {
+        if product.id == ProProduct.lifetime.rawValue { return "paywall.billing.once".localized(product.displayPrice) }
+        let period = product.periodDescription ?? ""
+        if let days = eligibleTrialDays(product) {
+            return "paywall.billing.trial".localized("\(days)", product.displayPrice, period)
+        }
+        return "paywall.billing.recurring".localized(product.displayPrice, period)
+    }
+
+    private func planTitle(_ product: Product) -> String {
+        product.id == ProProduct.yearly.rawValue ? "plan.yearly".localized : "plan.monthly".localized
+    }
+
+    /// Derived from this storefront's actual prices, never a fixed marketing claim.
+    private var annualSavings: Int? {
+        guard let monthly = manager.products.first(where: { $0.id == ProProduct.monthly.rawValue }),
+              let yearly = manager.products.first(where: { $0.id == ProProduct.yearly.rawValue }),
+              monthly.priceFormatStyle.currencyCode == yearly.priceFormatStyle.currencyCode,
+              monthly.price > 0 else { return nil }
+        let fullYear = NSDecimalNumber(decimal: monthly.price).doubleValue * 12
+        let percent = Int(((1 - NSDecimalNumber(decimal: yearly.price).doubleValue / fullYear) * 100).rounded(.down))
+        return percent > 0 ? percent : nil
     }
 }
 
-// MARK: - ProFeature CaseIterable
+private struct HeroCurve: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: .zero)
+        path.addLine(to: CGPoint(x: rect.maxX, y: 0))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - 24))
+        path.addQuadCurve(to: CGPoint(x: 0, y: rect.maxY - 24), control: CGPoint(x: rect.midX, y: rect.maxY + 24))
+        path.closeSubpath()
+        return path
+    }
+}
 
 extension ProFeature: CaseIterable {
-    static var allCases: [ProFeature] = [
-        .pipMode,
-        .duetMode,
-        .appIcons,
-    ]
+    static var allCases: [ProFeature] { [.pipMode, .duetMode, .appIcons] }
 }
 
-#Preview {
-    PaywallView(triggeredBy: .pipMode)
-}
+#Preview { PaywallView(triggeredBy: .pipMode) }

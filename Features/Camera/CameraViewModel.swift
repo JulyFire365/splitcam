@@ -126,9 +126,13 @@ final class CameraViewModel: ObservableObject {
 
     // MARK: - Computed
 
-    /// 当前导出分辨率（始终 1080p 基准，画质由码率控制）
+    /// Photo output stays independent of the video quality preference.
     var currentExportSize: CGSize {
         aspectRatio.exportSize
+    }
+
+    var currentVideoExportSize: CGSize {
+        resolutionQuality.outputSize(for: aspectRatio.exportSize)
     }
 
     var formattedDuration: String {
@@ -407,7 +411,7 @@ final class CameraViewModel: ObservableObject {
     func syncRecordingSnapshot() {
         // 录制中：outputSize 不可变（AVAssetWriter 已固定），其余布局参数实时同步
         if !isRecording {
-            recOutputSize = aspectRatio.exportSize
+            recOutputSize = currentVideoExportSize
         }
         recSplitMode = splitMode
         recSplitRatio = layoutEngine.splitRatio
@@ -710,7 +714,7 @@ final class CameraViewModel: ObservableObject {
 
     private func startRecording() {
         syncRecordingSnapshot()
-        let outputSize = currentExportSize
+        let outputSize = currentVideoExportSize
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("splitcam_composed_\(UUID().uuidString).mp4")
         composedOutputURL = outputURL
@@ -718,18 +722,7 @@ final class CameraViewModel: ObservableObject {
         do {
             let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 
-            // 根据画质档位调整码率
-            let videoBitRate: Int = resolutionQuality.videoBitRate
-            let videoSettings: [String: Any] = [
-                AVVideoCodecKey: AVVideoCodecType.hevc,
-                AVVideoWidthKey: Int(outputSize.width),
-                AVVideoHeightKey: Int(outputSize.height),
-                AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: videoBitRate,
-                    AVVideoExpectedSourceFrameRateKey: 30,
-                    AVVideoQualityKey: 0.95  // 高质量编码
-                ] as [String: Any]
-            ]
+            let videoSettings = resolutionQuality.videoOutputSettings(for: aspectRatio.exportSize)
 
             let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
             videoInput.expectsMediaDataInRealTime = true

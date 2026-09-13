@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E60005 /* PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60006; };
+		E60001 /* VideoQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60002; };
+		E60003 /* ProHeroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60004; };
 		4A05E8732F79607300B5F334 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A05E8722F79607300B5F334 /* StoreKit.framework */; };
 		4A05E8752F7960FB00B5F334 /* SplitCamX.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 4A05E8742F7960FB00B5F334 /* SplitCamX.storekit */; };
 		A10001 /* SplitCamApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* SplitCamApp.swift */; };
@@ -43,6 +46,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E60006 /* PreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewSupport.swift; sourceTree = "<group>"; };
+		E60002 /* VideoQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoQuality.swift; sourceTree = "<group>"; };
+		E60004 /* ProHeroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProHeroView.swift; sourceTree = "<group>"; };
 		4A05E8702F79604800B5F334 /* SplitCamRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SplitCamRelease.entitlements; sourceTree = "<group>"; };
 		4A05E8722F79607300B5F334 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		4A05E8742F7960FB00B5F334 /* SplitCamX.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = SplitCamX.storekit; sourceTree = "<group>"; };
@@ -133,6 +139,7 @@
 			isa = PBXGroup;
 			children = (
 				B10001 /* SplitCamApp.swift */,
+				E60006 /* PreviewSupport.swift */,
 				B10002 /* AppCoordinator.swift */,
 				E50002 /* ReviewPromptManager.swift */,
 				E50004 /* AppSettings.swift */,
@@ -205,6 +212,7 @@
 			isa = PBXGroup;
 			children = (
 				B10003 /* CameraEngine.swift */,
+				E60002 /* VideoQuality.swift */,
 			);
 			path = CameraEngine;
 			sourceTree = "<group>";
@@ -311,6 +319,7 @@
 			children = (
 				B10024 /* SubscriptionManager.swift */,
 				B10025 /* PaywallView.swift */,
+				E60004 /* ProHeroView.swift */,
 				B10026 /* SplitCamProducts.storekit */,
 			);
 			path = Subscription;
@@ -399,6 +408,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10001 /* SplitCamApp.swift in Sources */,
+				E60005 /* PreviewSupport.swift in Sources */,
 				A10002 /* AppCoordinator.swift in Sources */,
 				A10003 /* CameraEngine.swift in Sources */,
 				A10004 /* SplitLayoutEngine.swift in Sources */,
@@ -421,6 +431,8 @@
 				A10022 /* GalleryView.swift in Sources */,
 				A10023 /* SubscriptionManager.swift in Sources */,
 				A10024 /* PaywallView.swift in Sources */,
+				E60001 /* VideoQuality.swift in Sources */,
+				E60003 /* ProHeroView.swift in Sources */,
 				A10025 /* String+L10n.swift in Sources */,
 				E50001 /* ReviewPromptManager.swift in Sources */,
 				E50003 /* AppSettings.swift in Sources */,
@@ -587,6 +599,10 @@
 					AppIconBauhaus,
 					AppIconPixel,
 					AppIconInk,
+					AppIconChrome,
+					AppIconTerrazzo,
+					AppIconBlueprint,
+					AppIconBloom,
 				);
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
@@ -628,6 +644,10 @@
 					AppIconBauhaus,
 					AppIconPixel,
 					AppIconInk,
+					AppIconChrome,
+					AppIconTerrazzo,
+					AppIconBlueprint,
+					AppIconBloom,
 				);
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = SplitCamRelease.entitlements;

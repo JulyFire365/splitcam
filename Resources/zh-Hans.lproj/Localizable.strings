@@ -49,6 +49,36 @@
 
 /* ===== 画质 ===== */
 "quality.standard" = "标准";
+"settings.icon.chrome" = "液态银";
+"settings.icon.terrazzo" = "陶石";
+"settings.icon.blueprint" = "蓝图";
+"settings.icon.bloom" = "花绽";
+"settings.icon.requiresPro" = "此 App 图标为 SplitCam Pro 专属。";
+"quality.low" = "节省空间";
+"quality.low.detail" = "更小的视频文件，轻松分享";
+"quality.standard.detail" = "兼顾画面细节与文件大小";
+"quality.high.detail" = "为精彩时刻保留更多细节";
+"quality.estimate" = "每分钟约 %@ MB";
+"quality.footer" = "估算包含音频，实际大小因画面内容与录制时长而异。视频画质不会改变照片分辨率。";
+"paywall.headline" = "双重视角，\n让故事更完整。";
+"paywall.close" = "关闭";
+"paywall.benefit.pipMode" = "画中画视频，让你也在镜头里";
+"paywall.benefit.duetMode" = "导入视频，拍下你的同步演绎";
+"paywall.benefit.appIcons" = "多款专属图标，换上你的风格";
+"paywall.unavailable" = "暂时无法加载套餐，请重试。";
+"paywall.retry" = "重新加载";
+"paywall.billedYearly" = "按年付费";
+"paywall.billedMonthly" = "按月付费";
+"paywall.savings" = "比按月订阅节省 %@%%";
+"paywall.flexible" = "可随时取消";
+"paywall.once" = "一次购买";
+"paywall.unlock" = "解锁 SplitCam Pro";
+"paywall.billing.once" = "一次性支付 %@，无需订阅。";
+"paywall.billing.recurring" = "%@/%@，自动续订，可随时取消。";
+"paywall.billing.trial" = "免费试用 %@ 天，之后 %@/%@，自动续订，可随时取消。";
+"purchase.restore.success" = "已恢复你的 SplitCam Pro 购买。";
+"purchase.restore.empty" = "此 Apple 账户下未找到有效的 SplitCam Pro 购买记录。";
+"purchase.restore.failed" = "无法恢复购买：%@";
 "quality.high" = "高画质";
 
 /* ===== 边框样式 ===== */

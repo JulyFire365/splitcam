@@ -131,10 +131,15 @@ final class SubscriptionManager: ObservableObject {
 
     func restorePurchases() async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
 
-        try? await AppStore.sync()
-        await updatePurchasedProducts()
+        do {
+            try await AppStore.sync()
+            await updatePurchasedProducts()
+        } catch {
+            errorMessage = "purchase.restore.failed".localized(error.localizedDescription)
+        }
     }
 
     // MARK: - Transaction Listener

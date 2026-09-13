@@ -11,6 +11,10 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
     case bauhaus
     case pixel
     case ink
+    case chrome
+    case terrazzo
+    case blueprint
+    case bloom
 
     var id: String { rawValue }
 
@@ -24,6 +28,10 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
         case .bauhaus: "AppIconBauhaus"
         case .pixel: "AppIconPixel"
         case .ink: "AppIconInk"
+        case .chrome: "AppIconChrome"
+        case .terrazzo: "AppIconTerrazzo"
+        case .blueprint: "AppIconBlueprint"
+        case .bloom: "AppIconBloom"
         }
     }
 
@@ -37,6 +45,10 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
         case .bauhaus: "AppIconPreviewBauhaus"
         case .pixel: "AppIconPreviewPixel"
         case .ink: "AppIconPreviewInk"
+        case .chrome: "AppIconPreviewChrome"
+        case .terrazzo: "AppIconPreviewTerrazzo"
+        case .blueprint: "AppIconPreviewBlueprint"
+        case .bloom: "AppIconPreviewBloom"
         }
     }
 
@@ -46,7 +58,7 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
 
     var requiresPro: Bool {
         switch self {
-        case .bauhaus, .pixel, .ink:
+        case .bauhaus, .pixel, .ink, .chrome, .terrazzo, .blueprint, .bloom:
             true
         default:
             false
@@ -62,6 +74,10 @@ enum SplitCamAppIcon: String, CaseIterable, Identifiable {
         case "AppIconBauhaus": self = .bauhaus
         case "AppIconPixel": self = .pixel
         case "AppIconInk": self = .ink
+        case "AppIconChrome": self = .chrome
+        case "AppIconTerrazzo": self = .terrazzo
+        case "AppIconBlueprint": self = .blueprint
+        case "AppIconBloom": self = .bloom
         default: self = .signature
         }
     }
@@ -176,6 +192,9 @@ final class AppSettings: ObservableObject {
     }
 
     func selectAppIcon(_ icon: SplitCamAppIcon) async throws {
+        guard !icon.requiresPro || SubscriptionManager.shared.isPro else {
+            throw AppIconError.requiresPro
+        }
         guard UIApplication.shared.supportsAlternateIcons else {
             throw AppIconError.notSupported
         }
@@ -187,8 +206,12 @@ final class AppSettings: ObservableObject {
 
 enum AppIconError: LocalizedError {
     case notSupported
+    case requiresPro
 
     var errorDescription: String? {
-        "settings.icon.notSupported".localized
+        switch self {
+        case .notSupported: "settings.icon.notSupported".localized
+        case .requiresPro: "settings.icon.requiresPro".localized
+        }
     }
 }

@@ -93,28 +93,6 @@ enum AspectRatioMode: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Resolution Quality
-
-enum ResolutionQuality: String, CaseIterable {
-    case standard
-    case high
-
-    var displayName: String {
-        switch self {
-        case .standard: return "quality.standard".localized
-        case .high:     return "quality.high".localized
-        }
-    }
-
-    /// 视频码率（bps）
-    var videoBitRate: Int {
-        switch self {
-        case .standard: return 12_000_000   // 12 Mbps — 日常分享
-        case .high:     return 25_000_000   // 25 Mbps — 画质优先
-        }
-    }
-}
-
 // MARK: - Zoom Level
 
 enum ZoomLevel: CGFloat, CaseIterable {

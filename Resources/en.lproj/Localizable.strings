@@ -49,6 +49,36 @@
 
 /* ===== Quality ===== */
 "quality.standard" = "Standard";
+"settings.icon.chrome" = "Chrome";
+"settings.icon.terrazzo" = "Terrazzo";
+"settings.icon.blueprint" = "Blueprint";
+"settings.icon.bloom" = "Bloom";
+"settings.icon.requiresPro" = "This app icon is available with SplitCam Pro.";
+"quality.low" = "Space Saver";
+"quality.low.detail" = "Smaller videos for quick sharing";
+"quality.standard.detail" = "A balance of detail and file size";
+"quality.high.detail" = "More detail for your best moments";
+"quality.estimate" = "About %@ MB per minute";
+"quality.footer" = "Estimates include audio. Actual size varies with the scene and recording length. Video quality does not change photo resolution.";
+"paywall.headline" = "Two views.\nOne great story.";
+"paywall.close" = "Close";
+"paywall.benefit.pipMode" = "Keep yourself in the video with PiP";
+"paywall.benefit.duetMode" = "Record alongside an imported video";
+"paywall.benefit.appIcons" = "Make it yours with exclusive app icons";
+"paywall.unavailable" = "Plans couldn’t be loaded. Please try again.";
+"paywall.retry" = "Try Again";
+"paywall.billedYearly" = "Billed yearly";
+"paywall.billedMonthly" = "Billed monthly";
+"paywall.savings" = "Save %@%% vs. monthly";
+"paywall.flexible" = "Cancel anytime";
+"paywall.once" = "One-time purchase";
+"paywall.unlock" = "Unlock SplitCam Pro";
+"paywall.billing.once" = "%@ once. No subscription.";
+"paywall.billing.recurring" = "%@/%@. Auto-renews until canceled.";
+"paywall.billing.trial" = "%@ days free, then %@/%@. Auto-renews until canceled.";
+"purchase.restore.success" = "Your SplitCam Pro purchase has been restored.";
+"purchase.restore.empty" = "No active SplitCam Pro purchase was found for this Apple Account.";
+"purchase.restore.failed" = "Unable to restore purchases: %@";
 "quality.high" = "HD";
 
 /* ===== Border Style ===== */

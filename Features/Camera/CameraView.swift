@@ -62,7 +62,15 @@ struct CameraView: View {
         }
         .navigationBarHidden(true)
         .statusBarHidden(true)
-        .onAppear { viewModel.setup(mode: mode, settings: appSettings) }
+        .onAppear {
+            #if DEBUG && targetEnvironment(simulator)
+            if ScreenshotSupport.prepareCamera(viewModel) {
+                portraitControlsCollapsed = ScreenshotSupport.screen == "portrait"
+                return
+            }
+            #endif
+            viewModel.setup(mode: mode, settings: appSettings)
+        }
         .onDisappear {
             viewModel.persistLayoutIfNeeded(to: appSettings)
             viewModel.cleanup()
@@ -575,25 +583,22 @@ struct CameraView: View {
     // MARK: - Resolution Toggle (画质切换)
 
     private var resolutionToggle: some View {
-        Button {
-            if viewModel.resolutionQuality == .standard {
-                withAnimation(.spring(response: 0.3)) {
-                    viewModel.resolutionQuality = .high
-                    appSettings.defaultVideoQuality = .high
+        Menu {
+            ForEach(ResolutionQuality.allCases, id: \.self) { quality in
+                Button {
+                    guard !viewModel.isRecording else { return }
+                    viewModel.resolutionQuality = quality
+                    appSettings.defaultVideoQuality = quality
                     viewModel.syncRecordingSnapshot()
-                }
-            } else {
-                withAnimation(.spring(response: 0.3)) {
-                    viewModel.resolutionQuality = .standard
-                    appSettings.defaultVideoQuality = .standard
-                    viewModel.syncRecordingSnapshot()
+                } label: {
+                    Label(quality.displayName, systemImage: viewModel.resolutionQuality == quality ? "checkmark" : quality.symbol)
                 }
             }
         } label: {
             HStack(spacing: 3) {
-                Image(systemName: viewModel.resolutionQuality == .high ? "sparkles" : "circle")
+                Image(systemName: viewModel.resolutionQuality.symbol)
                     .font(.system(size: 8))
-                Text(viewModel.resolutionQuality == .high ? "HD" : "SD")
+                Text(viewModel.resolutionQuality.shortLabel)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
             }
             .foregroundColor(viewModel.resolutionQuality == .high ? .yellow : .white.opacity(0.5))
@@ -604,6 +609,9 @@ struct CameraView: View {
                     .fill(viewModel.resolutionQuality == .high ? .yellow.opacity(0.2) : .clear)
             )
         }
+        .disabled(viewModel.isRecording)
+        .accessibilityLabel("settings.videoQuality".localized)
+        .accessibilityValue(viewModel.resolutionQuality.displayName)
     }
 
     // MARK: - Duet Mode Badge (紧凑胶囊)

@@ -1,9 +1,9 @@
-SplitCam 1.7:
+What’s new in SplitCam:
 
-- Added more app icons, with selected premium styles available for Pro.
-- In 9:16, you can now collapse the frame and quality controls for a clearer composition.
-- Picture-in-Picture resize guidance now appears only on first use for a cleaner experience.
-- Remember Last Capture Layout & Settings now restores your photo/video mode, frame, camera swap, and mirror state.
-- Added a subscription entry point and contact email in Settings.
+- New Space Saver video quality creates smaller files for easier sharing.
+- Choose from Space Saver, Standard, and HD, with estimated file sizes in Settings.
+- Four new Pro app icons: Chrome, Terrazzo, Blueprint, and Bloom.
+- A redesigned SplitCam Pro page with an animated dual-lens header and clearer plan choices.
+- A simpler Settings page. Restore Purchases is available on the Pro page.
 
 Thanks for using SplitCam!
