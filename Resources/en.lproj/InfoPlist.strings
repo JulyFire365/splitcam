@@ -1,4 +1,4 @@
 NSCameraUsageDescription = "SplitCam needs access to your camera for dual-camera split-screen recording.";
-NSMicrophoneUsageDescription = "SplitCam needs access to your microphone to record audio with video.";
+NSMicrophoneUsageDescription = "SplitCam uses the microphone to include audio in videos you choose to record. Photos and recording without microphone audio work without this permission.";
 NSPhotoLibraryAddUsageDescription = "SplitCam needs access to save your photos and videos to your photo library.";
 NSPhotoLibraryUsageDescription = "SplitCam needs access to your photo library to import videos for duet mode.";

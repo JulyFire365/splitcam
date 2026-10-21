@@ -86,31 +86,45 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
         AVCaptureMultiCamSession.isMultiCamSupported
     }
 
+    /// Photos require camera access only. Microphone permission is requested at recording time.
     func checkPermissions() async -> Bool {
-        let videoStatus = AVCaptureDevice.authorizationStatus(for: .video)
-        let audioStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-
-        let videoGranted: Bool
-        switch videoStatus {
-        case .authorized:
-            videoGranted = true
-        case .notDetermined:
-            videoGranted = await AVCaptureDevice.requestAccess(for: .video)
-        default:
-            videoGranted = false
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: return true
+        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .video)
+        default: return false
         }
+    }
 
-        let audioGranted: Bool
-        switch audioStatus {
-        case .authorized:
-            audioGranted = true
-        case .notDetermined:
-            audioGranted = await AVCaptureDevice.requestAccess(for: .audio)
-        default:
-            audioGranted = false
+    func prepareRecordingAudio() async -> Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        let granted: Bool
+        switch status {
+        case .authorized: granted = true
+        case .notDetermined: granted = await AVCaptureDevice.requestAccess(for: .audio)
+        default: granted = false
         }
+        guard granted else { return false }
+        return await withCheckedContinuation { continuation in
+            sessionQueue.async { [weak self] in
+                guard let self else { continuation.resume(returning: false); return }
+                self.multiCamSession.beginConfiguration()
+                self.configureRecordingAudio()
+                self.multiCamSession.commitConfiguration()
+                continuation.resume(returning: self.audioDeviceInput != nil && self.audioOutput != nil)
+            }
+        }
+    }
 
-        return videoGranted && audioGranted
+    func stopRecordingAudio() {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            self.multiCamSession.beginConfiguration()
+            if let output = self.audioOutput { self.multiCamSession.removeOutput(output) }
+            if let input = self.audioDeviceInput { self.multiCamSession.removeInput(input) }
+            self.audioOutput = nil
+            self.audioDeviceInput = nil
+            self.multiCamSession.commitConfiguration()
+        }
     }
 
     func setupSession(resolution: CaptureResolution = .hd1080p) {
@@ -613,7 +627,13 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
             }
         }
 
-        // Setup audio
+
+    }
+
+    private func configureRecordingAudio() {
+        // Connect the microphone only for an explicitly started recording.
+        guard audioDeviceInput == nil,
+              AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
         if let audioDevice = AVCaptureDevice.default(for: .audio) {
             do {
                 let input = try AVCaptureDeviceInput(device: audioDevice)
@@ -629,7 +649,7 @@ final class CameraEngine: NSObject, ObservableObject, @unchecked Sendable {
                     audioOutput = output
                 }
             } catch {
-                DispatchQueue.main.async { self.error = .configurationFailed(error.localizedDescription) }
+                VideoSaveDiagnostics.record("microphone-setup", error: error)
             }
         }
     }

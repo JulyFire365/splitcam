@@ -12,6 +12,8 @@ final class CameraViewModel: ObservableObject {
     // MARK: - Published State
 
     @Published var isRecording = false
+    @Published var recordingWithoutMicrophone = false
+    private var recordingPreparationID: UUID?
     @Published var splitMode: SplitMode = .leftRight {
         didSet {
             layoutEngine.splitMode = splitMode
@@ -336,12 +338,18 @@ final class CameraViewModel: ObservableObject {
     }
 
     func cleanup() {
+        recordingPreparationID = nil
+        if !isRecording { isProcessing = false }
+        cameraEngine.stopRecordingAudio()
         if isRecording { stopRecording() }
         cameraEngine.stopSession()
         mediaImporter.cleanup()
     }
 
     func pauseSession() {
+        recordingPreparationID = nil
+        if !isRecording { isProcessing = false }
+        cameraEngine.stopRecordingAudio()
         // 录制中切后台：自动停止录制并保存
         if isRecording {
             stopRecording()
@@ -744,18 +752,36 @@ final class CameraViewModel: ObservableObject {
     private func startRecording() {
         guard !isProcessing, !isRecording, camerasReady else { return }
         isProcessing = true
+        let preparationID = UUID()
+        recordingPreparationID = preparationID
+        Task {
+            let includeAudio = await cameraEngine.prepareRecordingAudio()
+            guard recordingPreparationID == preparationID,
+                  UIApplication.shared.applicationState != .background else {
+                cameraEngine.stopRecordingAudio()
+                isProcessing = false
+                return
+            }
+            recordingPreparationID = nil
+            recordingWithoutMicrophone = !includeAudio
+            beginRecording(includeAudio: includeAudio)
+        }
+    }
+
+    private func beginRecording(includeAudio: Bool) {
         photoAccessDenied = false
         recordingGeneration = UUID()
         syncRecordingSnapshot()
         do {
             let url = try pendingVideoStore.makeRecordingURL()
-            recordingID = try recorder.start(url: url, fullSize: aspectRatio.exportSize, quality: resolutionQuality) { [weak self] id in
+            recordingID = try recorder.start(url: url, fullSize: aspectRatio.exportSize, quality: resolutionQuality, includeAudio: includeAudio) { [weak self] id in
                 DispatchQueue.main.async {
                     guard let self, self.recordingID == id, self.isRecording else { return }
                     self.stopRecording()
                 }
             }
         } catch {
+            cameraEngine.stopRecordingAudio()
             VideoSaveDiagnostics.record("recording-setup", error: error)
             isProcessing = false
             errorMessage = "error.recordingInit".localized
@@ -775,7 +801,7 @@ final class CameraViewModel: ObservableObject {
             }
         }
         if isDuetMode && importedPlayer != nil { mediaImporter.startPlayback() }
-    }
+        }
 
     private func stopRecording() {
         guard isRecording, let id = recordingID else { return }
@@ -797,6 +823,7 @@ final class CameraViewModel: ObservableObject {
     private func handleFinishedRecording(_ result: Result<URL, VideoRecordingSession.Failure>, id: UUID) async {
         guard recordingID == id else { return }
         recordingID = nil
+        cameraEngine.stopRecordingAudio()
         switch result {
         case .success(let outputURL):
             do {

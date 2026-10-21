@@ -39,6 +39,14 @@ struct CameraView: View {
                 VStack(spacing: 0) {
                     // 顶部控件 + 渐变遮罩
                     topOverlay
+                    if viewModel.isRecording && viewModel.recordingWithoutMicrophone {
+                        Label("camera.noMicrophoneAudio".localized, systemImage: "mic.slash")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(8)
+                            .background(.black.opacity(0.75), in: Capsule())
+                            .accessibilityAddTraits(.updatesFrequently)
+                    }
                     Spacer()
                     // 底部控件 + 渐变遮罩
                     bottomOverlay

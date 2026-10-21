@@ -19,7 +19,7 @@ final class VideoRecordingSession: @unchecked Sendable {
         let size: CGSize
         let writer: AVAssetWriter
         let video: AVAssetWriterInput
-        let audio: AVAssetWriterInput
+        let audio: AVAssetWriterInput?
         let adaptor: AVAssetWriterInputPixelBufferAdaptor
         let onFailure: (UUID) -> Void
         var finishing = false
@@ -29,30 +29,30 @@ final class VideoRecordingSession: @unchecked Sendable {
         var videoFrames = 0
         var failure: Failure?
 
-        init(url: URL, size: CGSize, settings: [String: Any], onFailure: @escaping (UUID) -> Void) throws {
+        init(url: URL, size: CGSize, settings: [String: Any], includeAudio: Bool, onFailure: @escaping (UUID) -> Void) throws {
             self.url = url
             self.size = size
             self.onFailure = onFailure
             writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
             video = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
             video.expectsMediaDataInRealTime = true
-            audio = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+            audio = includeAudio ? AVAssetWriterInput(mediaType: .audio, outputSettings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: 44100,
                 AVNumberOfChannelsKey: 1,
                 AVEncoderBitRateKey: 128000
-            ])
-            audio.expectsMediaDataInRealTime = true
+            ]) : nil
+            audio?.expectsMediaDataInRealTime = true
             adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: video, sourcePixelBufferAttributes: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                 kCVPixelBufferWidthKey as String: Int(size.width),
                 kCVPixelBufferHeightKey as String: Int(size.height)
             ])
-            guard writer.canAdd(video), writer.canAdd(audio) else {
+            guard writer.canAdd(video), audio.map({ writer.canAdd($0) }) ?? true else {
                 throw Failure.encoding(stage: "configure-inputs", underlying: writer.error)
             }
             writer.add(video)
-            writer.add(audio)
+            if let audio { writer.add(audio) }
             guard writer.startWriting() else {
                 throw Failure.encoding(stage: "start-writing", underlying: writer.error)
             }
@@ -68,7 +68,7 @@ final class VideoRecordingSession: @unchecked Sendable {
         return CIContext(options: [.useSoftwareRenderer: false])
     }()
 
-    func start(url: URL, fullSize: CGSize, quality: ResolutionQuality,
+    func start(url: URL, fullSize: CGSize, quality: ResolutionQuality, includeAudio: Bool = true,
                onFailure: @escaping (UUID) -> Void) throws -> UUID {
         try queue.sync {
             guard context == nil else { throw Failure.busy }
@@ -77,7 +77,7 @@ final class VideoRecordingSession: @unchecked Sendable {
             }
             do {
                 let next = try Context(url: url, size: quality.outputSize(for: fullSize),
-                                       settings: quality.videoOutputSettings(for: fullSize), onFailure: onFailure)
+                                       settings: quality.videoOutputSettings(for: fullSize), includeAudio: includeAudio, onFailure: onFailure)
                 context = next
                 return next.id
             } catch {
@@ -130,7 +130,8 @@ final class VideoRecordingSession: @unchecked Sendable {
     func appendAudio(_ sample: CMSampleBuffer) {
         queue.sync {
             guard let current = context, !current.finishing, current.failure == nil,
-                  current.videoFrames > 0, let start = current.startTime else { return }
+                  current.videoFrames > 0, let start = current.startTime,
+                  let audio = current.audio else { return }
             guard current.writer.status == .writing else {
                 fail(current, stage: "audio-writer-state", error: current.writer.error)
                 return
@@ -139,8 +140,8 @@ final class VideoRecordingSession: @unchecked Sendable {
             // Buffered audio can precede the first accepted video frame on cold start.
             guard timestamp.isNumeric, timestamp >= start,
                   current.lastAudioTime.map({ timestamp > $0 }) ?? true,
-                  CMSampleBufferDataIsReady(sample), current.audio.isReadyForMoreMediaData else { return }
-            guard current.audio.append(sample) else {
+                  CMSampleBufferDataIsReady(sample), audio.isReadyForMoreMediaData else { return }
+            guard audio.append(sample) else {
                 fail(current, stage: "append-audio", error: current.writer.error)
                 return
             }
@@ -172,7 +173,7 @@ final class VideoRecordingSession: @unchecked Sendable {
             // Even a single accepted frame needs a positive duration for Photos.
             current.writer.endSession(atSourceTime: last + CMTime(value: 1, timescale: 30))
             current.video.markAsFinished()
-            current.audio.markAsFinished()
+            current.audio?.markAsFinished()
             current.writer.finishWriting {
                 self.queue.async {
                     // Inspect the captured writer, never whichever one is current later.

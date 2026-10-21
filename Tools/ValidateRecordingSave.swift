@@ -65,6 +65,22 @@ private final class TestPhotoLibrary: VideoPhotoLibrary, @unchecked Sendable {
             print("PASS \(quality.rawValue): \(Int(size.width))×\(Int(size.height)), 1 second, video and audio decode")
         }
 
+        // A denied/unavailable microphone must produce a playable video without
+        // an audio track, even if a late microphone callback reaches the writer.
+        let silentURL = root.appendingPathComponent("without-microphone.mp4")
+        let silentID = try recorder.start(url: silentURL, fullSize: fullSize, quality: .low, includeAudio: false) { _ in }
+        for frame in 0..<10 {
+            let time = CMTime(value: Int64(frame), timescale: 30)
+            try await append(recorder, at: time)
+            recorder.appendAudio(try audio(at: time))
+        }
+        _ = try await finish(recorder, id: silentID).get()
+        let silentAsset = AVURLAsset(url: silentURL)
+        let silentTracks = try await silentAsset.loadTracks(withMediaType: .audio)
+        precondition(silentTracks.isEmpty, "Denied microphone must not create an audio track")
+        _ = try await AVAssetImageGenerator(asset: silentAsset).image(at: .zero)
+        print("PASS video without microphone audio: playable and no audio track")
+
         // No accepted frames is a distinct result, not generic save failure or silent success.
         let empty = root.appendingPathComponent("empty.mp4")
         let emptyID = try recorder.start(url: empty, fullSize: fullSize, quality: .low) { _ in }

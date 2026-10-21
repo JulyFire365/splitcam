@@ -8,3 +8,5 @@ SplitCam 1.8:
 - Improved video saving, with clearer error messages and a retry option for videos that could not be added to Photos.
 
 Thanks for helping us make SplitCam better!
+
+Photos and camera preview no longer depend on microphone access. Video can record without a microphone audio track, with a visible recording indicator.

@@ -169,14 +169,16 @@
 "permission.camera.title" = "摄像头";
 "permission.camera.desc" = "用于前后双摄同时拍摄照片和视频";
 "permission.mic.title" = "麦克风";
-"permission.mic.desc" = "用于录制视频时采集音频";
+"permission.mic.desc" = "可选：录制视频时添加麦克风音轨";
 "permission.photo.title" = "相册";
-"permission.photo.desc" = "用于保存拍摄内容和导入合拍视频";
+"permission.photo.desc" = "保存至照片时可选；导入使用系统选择器";
 "permission.openSettings" = "前往设置开启";
 "permission.hint" = "开启权限后返回 App 即可自动启动相机";
 
 /* ===== 错误信息 ===== */
 "error.multiCamNotSupported" = "此设备不支持多摄像头同时录制，需要 iPhone XS 或更新机型";
 "error.configFailed" = "摄像头配置失败：%@";
-"error.permissionDenied" = "请在设置中允许 SplitCam 访问摄像头和麦克风";
+"error.permissionDenied" = "请在设置中允许摄像头访问。麦克风访问为可选项。";
 "error.recordingFailed" = "录制失败：%@";
+
+"camera.noMicrophoneAudio" = "正在录制，不含麦克风音轨";
